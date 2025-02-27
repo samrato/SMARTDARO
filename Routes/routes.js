@@ -21,42 +21,43 @@ const {
     deleteTimetableController
 } = require("../controllers/timetableController");
 const isAdmin = require("../middleware/UserAdmin");
+const authMiddleware=require("../middleware/authMiddleware")
 
 const router = Router();
 
 // ============= User Authentication Routes =============
 router.post("/register", registerUser);
 router.post("/login", loginUser);
-router.get("/:userId", getUser);
-router.put("/:userId", updateUser);
+router.get("/:userId",authMiddleware, getUser);
+router.put("/:userId", authMiddleware,updateUser);
 
 // ============= Venue Routes (Fixed Conflicts) =============
-router.get('/venues', getAllVenuesController);
-router.get('/venues/:venueId', getVenueByIdController);
+router.get('/venues', authMiddleware,getAllVenuesController);
+router.get('/venues/:venueId',authMiddleware, getVenueByIdController);
 // Admin routes (protected)
-router.post('/venues', isAdmin, addVenueController);
-router.put('/venues/:venueId', isAdmin, updateVenueController);
-router.delete('/venues/:venueId', isAdmin, deleteVenueController);
+router.post('/venues',authMiddleware, isAdmin, addVenueController);
+router.put('/venues/:venueId',authMiddleware, isAdmin, updateVenueController);
+router.delete('/venues/:venueId', authMiddleware,isAdmin, deleteVenueController);
 
 
 
 // ============= Course Routes (Fixed Conflicts) =============
 
 
-router.get("/", getAllCoursesController);
-router.get("/:courseId", getCourseByIdController);
+router.get("/", authMiddleware,getAllCoursesController);
+router.get("/:courseId", authMiddleware,getCourseByIdController);
 // Admin routes (protected)
-router.post("/", isAdmin, addCourseController);
-router.put("/:courseId", isAdmin, updateCourseController);
-router.delete("/:courseId", isAdmin, deleteCourseController);
+router.post("/", authMiddleware,isAdmin, addCourseController);
+router.put("/:courseId",authMiddleware, isAdmin, updateCourseController);
+router.delete("/:courseId",authMiddleware, isAdmin, deleteCourseController);
 
 
 // ============= Course Routes (Fixed Conflicts) =============
-router.get("/:day", getTimetableByDayController);
-router.get("/id/:id", getTimetableByIdController);
+router.get("/:day",authMiddleware, getTimetableByDayController);
+router.get("/id/:id", authMiddleware,getTimetableByIdController);
 // Admin routes (protected)
-router.post("/allocate-ai", isAdmin, allocateTimetableAIController);
-router.delete("/:id", isAdmin, deleteTimetableController);
+router.post("/allocate-ai", authMiddleware,isAdmin, allocateTimetableAIController);
+router.delete("/:id",authMiddleware, isAdmin, deleteTimetableController);
 
 
 
