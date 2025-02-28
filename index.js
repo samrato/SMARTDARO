@@ -8,22 +8,20 @@ dotenv.config();
 
 const app = express();
 
-// Allowed origins for CORS
 const allowedOrigins = [
-    "https://frontend-example.com",
-    "http://localhost:3000"  // Allow local dev environment
+  "http://localhost:5173", // Add your frontend URL here
+  "https://yourfrontenddomain.com" // If you have a live domain, add it here
 ];
 
-// Apply CORS middleware correctly
 app.use(cors({
-    origin: function (origin, callback) {
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            callback(new Error("Not allowed by CORS"));
-        }
-    },
-    credentials: true  // Allows sending cookies with requests
+  origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+      } else {
+          callback(new Error("Not allowed by CORS"));
+      }
+  },
+  credentials: true, // Allows cookies and credentials to be sent with requests
 }));
 
 // Middleware
