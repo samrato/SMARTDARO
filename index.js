@@ -31,7 +31,7 @@ app.use(express.json()); // Should be placed before routes
 // Routes
 app.use('/api', routes);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // Connect to the database and start the server
 const startServer = async () => {
