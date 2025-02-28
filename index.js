@@ -10,7 +10,7 @@ const app = express();
 
 
 const allowedOrigins = [
-  "http://localhost:5173", // Add your frontend URL here ni god manze
+  "http://localhost:5173", // Add your frontend URL here ni god manze....
   "https://yourfrontenddomain.com" // If you have a live domain, add it here
 ];
 
