@@ -40,7 +40,7 @@ const addCourseController = async (req, res, next) => {
         res.status(201).json({ status: "success", course: newCourse });
     } catch (error) {
         console.error(error)
-        return res.status(500).json({message:"failed to fetch courses"})
+        return res.status(500).json({message:"failed to fetch "})
     }
 };
 
@@ -48,13 +48,14 @@ const addCourseController = async (req, res, next) => {
 const updateCourseController = async (req, res, next) => {
     try {
         if (!req.user || req.user.role !== "admin") {
-            return next(new HttpError("Unauthorized: Admins only", 403));
+            return res.status(403).json({message:"Unauthorize :Admins only"})
         }
 
         const updatedCourse = await courseService.updateCourse(req.params.courseId, req.body);
         res.json({ status: "success", course: updatedCourse });
     } catch (error) {
-        next(new HttpError(error.message, 500));
+        console.error(error)
+        return res.status(500).json({message:"failed to fetch "})
     }
 };
 
@@ -62,13 +63,14 @@ const updateCourseController = async (req, res, next) => {
 const deleteCourseController = async (req, res, next) => {
     try {
         if (!req.user || req.user.role !== "admin") {
-            return next(new HttpError("Unauthorized: Admins only", 403));
+            return res.status(403).json({message:"Unauthorize :Admins only"})
         }
 
         await courseService.deleteCourse(req.params.courseId);
         res.json({ status: "success", message: "Course deleted successfully" });
     } catch (error) {
-        next(new HttpError(error.message, 500));
+        console.error(error)
+        return res.status(500).json({message:"failed to fetch "})
     }
 };
 
