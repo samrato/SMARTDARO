@@ -45,3 +45,12 @@ smartdaro-backend/
 ├── .env
 ├── server.js
 └── README.md
+
+
+🧠 How AI Works
+
+    Room Allocation: Uses constraint-based matching and capacity analysis to assign rooms intelligently.
+
+    Timetable Generator: Ensures no clashes, balances load, and accommodates lecturer availability.
+
+    Alerts: Triggered automatically on events like changes, conflicts, or special notices.
