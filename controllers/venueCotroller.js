@@ -10,7 +10,8 @@ const getAllVenuesController = async (req, res, next) => {
         res.json({ status: 'success', venues });
     } catch (error) {
         console.error("Error fetching venues:", error);
-        return next(new HttpError("Failed to fetch venues", 500));
+        return res.status(500).json({message:"Failed to fetch venues "})
+        
     }
 };
 
@@ -22,7 +23,7 @@ const getVenueByIdController = async (req, res, next) => {
         res.json({ status: 'success', venue });
     } catch (error) {
         console.error("Error fetching venue:", error);
-        return next(new HttpError(error.message || "Failed to fetch venue", 500));
+        return  res.status(500).json({message:"Failed to fetch the venue "})
     }
 };
 
@@ -32,14 +33,14 @@ const addVenueController = async (req, res, next) => {
         const { name, capacity, location, isAvailable } = req.body;
 
         if (!name || !capacity) {
-            return next(new HttpError("Fill in all required fields", 422));
+            return res.status(422).json({message:"All fields are required"})
         }
 
         const newVenue = await venueService.addVenue({ name, capacity, location, isAvailable });
         res.status(201).json({ status: 'success', venue: newVenue });
     } catch (error) {
         console.error("Error adding venue:", error);
-        return next(new HttpError(error.message || "Failed to add venue", 500));
+        return res.status(500).json({message:"Failed to add venue "})
     }
 };
 
@@ -52,13 +53,14 @@ const updateVenueController = async (req, res, next) => {
         const updatedVenue = await venueService.updateVenue(venueId, { name, capacity, location, isAvailable });
 
         if (!updatedVenue) {
-            return next(new HttpError("Venue not found", 404));
+            return res.status(404).json({message:"Venue not found"})
         }
 
         res.json({ status: 'success', venue: updatedVenue });
     } catch (error) {
         console.error("Error updating venue:", error);
-        return next(new HttpError(error.message || "Failed to update venue", 500));
+        return res.status(500).json({message:"Failed to update venue"})
+        
     }
 };
 
@@ -69,13 +71,14 @@ const deleteVenueController = async (req, res, next) => {
         const deletedVenue = await venueService.deleteVenue(venueId);
 
         if (!deletedVenue) {
-            return next(new HttpError("Venue not found", 404));
+            return res.status(404).json({message:"Venue not found"})
         }
 
         res.json({ status: 'success', message: 'Venue deleted successfully' });
     } catch (error) {
         console.error("Error deleting venue:", error);
-        return next(new HttpError(error.message || "Failed to delete venue", 500));
+        return res.status(500).json({message:"Internl server error"})
+        
     }
 };
 

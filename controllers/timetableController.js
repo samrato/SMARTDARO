@@ -1,4 +1,4 @@
-const HttpError = require('../models/errorModel');
+
 const {
     allocateTimetableAI,
     getTimetableByDay,
@@ -10,20 +10,21 @@ const {
 const allocateTimetableAIController = async (req, res, next) => {
     try {
         if (!req.user || req.user.role !== 'admin') {
-            return next(new HttpError("Unauthorized: Admins only", 403));
+            return res.status(403).json({message:"Unauthorized:Admin only"})
         }
 
         const { courseId, instructorId, students, preferredDay, preferredStartTime, preferredEndTime } = req.body;
 
         if (!courseId || !instructorId || !students || !preferredDay || !preferredStartTime || !preferredEndTime) {
-            return next(new HttpError("All fields are required", 400));
+            return res.status(400).json({message:"All fields are required"})
         }
 
         const timetable = await allocateTimetableAI(courseId, instructorId, students, preferredDay, preferredStartTime, preferredEndTime);
         res.status(201).json({ status: 'success', timetable });
     } catch (error) {
         console.error("Error allocating AI timetable:", error);
-        return next(new HttpError(error.message || "Failed to allocate timetable", 500));
+        return res.status(500).json({message:"Failed to allocate timetable "})
+         
     }
 };
 
@@ -34,13 +35,15 @@ const getTimetableByDayController = async (req, res, next) => {
         const timetables = await getTimetableByDay(day);
 
         if (!timetables || timetables.length === 0) {
-            return next(new HttpError("No timetables found for this day", 404));
+            return res.status(404).json({message:"No timetable found for this today"})
+            
         }
 
         res.json({ status: 'success', timetables });
     } catch (error) {
         console.error("Error retrieving timetables:", error);
-        return next(new HttpError(error.message || "Failed to fetch timetables", 500));
+        return res.json(500).json({message:"Failed to fetch the timetable "})
+        
     }
 };
 
@@ -51,7 +54,8 @@ const getTimetableByIdController = async (req, res, next) => {
         res.json({ status: 'success', timetable });
     } catch (error) {
         console.error("Error retrieving timetable by ID:", error);
-        return next(new HttpError(error.message || "Failed to fetch timetable", 500));
+        return res.status(500).json({message:"Failed to fetch timetable"})
+        
     }
 };
 
@@ -59,14 +63,16 @@ const getTimetableByIdController = async (req, res, next) => {
 const deleteTimetableController = async (req, res, next) => {
     try {
         if (!req.user || req.user.role !== 'admin') {
-            return next(new HttpError("Unauthorized: Admins only", 403));
+            return res.status(403).json({message:"Unauthorized: Admins only"})
+            
         }
 
         await deleteTimetable(req.params.id);
         res.json({ status: 'success', message: "Timetable entry deleted successfully" });
     } catch (error) {
         console.error("Error deleting timetable:", error);
-        return next(new HttpError(error.message || "Failed to delete timetable", 500));
+        return res.status(500).json({message:"Failed to delete timeetable"})
+        
     }
 };
 
