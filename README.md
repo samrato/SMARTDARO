@@ -13,38 +13,15 @@ SmartDaro is a smart backend system built with Node.js and Express.js that uses 
 
     Backend: Node.js, Express.js
 
-    Database: MongoDB / PostgreSQL (customizable)
+    Database: MongoDB
 
     Authentication: JWT
 
-    AI Logic: Custom algorithms or integration with AI services (e.g., Python microservices, TensorFlow, or OpenAI)
-
-    Notifications: Email (Nodemailer), In-app Alerts (WebSockets or Polling)
+    AI Logic: Custom algorithms or integration with AI services 
 
 📁 Project Structure
 
-smartdaro-backend/
-├── controllers/
-│   └── roomController.js
-│   └── timetableController.js
-│   └── alertController.js
-├── models/
-│   └── Room.js
-│   └── Timetable.js
-│   └── User.js
-├── routes/
-│   └── rooms.js
-│   └── timetable.js
-│   └── alerts.js
-├── utils/
-│   └── aiAllocator.js
-│   └── timetableGenerator.js
-│   └── notifier.js
-├── middleware/
-│   └── auth.js
-├── .env
-├── server.js
-└── README.md
+
 
 
 🧠 How AI Works
@@ -54,3 +31,17 @@ smartdaro-backend/
     Timetable Generator: Ensures no clashes, balances load, and accommodates lecturer availability.
 
     Alerts: Triggered automatically on events like changes, conflicts, or special notices.
+
+
+
+    ✅ Future Enhancements
+   
+    Role-based access (Admin, Student, Lecturer)
+
+    Dashboard Analytics
+
+    AI Model Training UI
+
+    SMS and Push Notification Integration
+
+    Built by  samrato contributions are welcome!
