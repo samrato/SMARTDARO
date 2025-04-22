@@ -38,7 +38,7 @@ This is how the frontend of **SmartDaro** looks and works:
     Timetable Generator: Ensures no clashes, balances load, and accommodates lecturer availability.
 
     Alerts: Triggered automatically on events like changes, conflicts, or special notices.
-
+This is how the frontend of **SmartDaro** looks and works:
 ![SmartDaro Frontend Preview](previe/smartdaro.jpg)
 
     ✅ Future Enhancements
