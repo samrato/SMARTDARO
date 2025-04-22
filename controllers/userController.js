@@ -13,22 +13,24 @@ const registerUser = async (req, res, next) => {
         const { fullName, email, password, password2 } = req.body;
 
         if (!fullName || !email || !password || !password2) {
-            return next(new HttpError("Fill in all fields", 422));
+            return res.status(422).json({message:"Fill in all fields"})
         }
 
         const newEmail = email.toLowerCase();
         const existingUser = await User.findOne({ email: newEmail });
 
         if (existingUser) {
-            return next(new HttpError("Email already exists", 422));
+            return res.status(422).json({message:"Email already exits "})
+            
         }
 
         if (password.trim().length < 6) {
-            return next(new HttpError("Password must be at least 6 characters", 422));
+            return res.status(422).js({message:"Password must be at least 6 characters"})
+            
         }
 
         if (password !== password2) {
-            return next(new HttpError("Passwords do not match", 422));
+            return res.status(422).json({message:"password do not match"})
         }
 
         const salt = await bcrypt.genSalt(10);
@@ -42,7 +44,8 @@ const registerUser = async (req, res, next) => {
 
     } catch (error) {
         console.error("Registration Error:", error);
-        return next(new HttpError("User registration failed", 500));
+        return res.status(500).json({message:"User registration Failed"})
+        
     }
 };
 
@@ -58,19 +61,21 @@ const loginUser = async (req, res, next) => {
         const { email, password } = req.body;
 
         if (!email || !password) {
-            return next(new HttpError("Fill in all fields", 422));
+            return res.status(422).json({message:"Fill in all fields"})
+            
         }
 
         const newEmail = email.toLowerCase();
         const user = await User.findOne({ email: newEmail }).select("+password");
 
         if (!user) {
-            return next(new HttpError("Invalid credentials", 422));
+            return res.status(422).json({message:"Invalid Credentials "})
+            
         }
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            return next(new HttpError("Invalid credentials", 422));
+            return res.status(422).json({message:"Invalid credentials"})
         }
 
         const token = generateToken({ id: user._id, isAdmin: user.isAdmin });
@@ -79,7 +84,8 @@ const loginUser = async (req, res, next) => {
 
     } catch (error) {
         console.error("Login Error:", error);
-        return next(new HttpError("Login failed, try again later", 500));
+        return res.status(500).json({message:"Login failed ,try again later"})
+       
     }
 };
 
@@ -91,14 +97,16 @@ const getUser = async (req, res, next) => {
         const user = await User.findById(userId).select("-password");
 
         if (!user) {
-            return next(new HttpError("User not found", 404));
+            return res.status(404).json({message:"User not found"})
+            
         }
 
         res.json({ status: "success", user });
 
     } catch (error) {
         console.error("Get User Error:", error);
-        return next(new HttpError("Could not retrieve user", 500));
+        return res.status(500).json({message:"Could not retrive user"})
+       
     }
 };
 
@@ -112,7 +120,8 @@ const updateUser = async (req, res, next) => {
         const updatedUser = await User.findByIdAndUpdate(userId, { preferences }, { new: true });
 
         if (!updatedUser) {
-            return next(new HttpError("User not found", 404));
+            return res.status(404).json({message:"User not found"})
+           
         }
 
         res.json({ status: "success", user: updatedUser });
