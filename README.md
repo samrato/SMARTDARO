@@ -3,6 +3,13 @@
 SmartDaro is a smart backend system built with Node.js and Express.js that uses AI-driven logic to handle room allocation, timetable generation, and alert notifications for academic institutions.
 🚀 Features
 
+
+## 🖼️ Frontend Preview
+
+This is how the frontend of **SmartDaro** looks and works:
+
+![SmartDaro Frontend Preview](previe/smararo.jpg)
+
     🧠 AI-Based Room Allocation: Smartly assigns students or staff to available rooms based on availability, course type, and preferences.
 
     📅 Timetable Generation: Uses AI algorithms to generate clash-free, optimized timetables for students and lecturers.
@@ -32,7 +39,7 @@ SmartDaro is a smart backend system built with Node.js and Express.js that uses 
 
     Alerts: Triggered automatically on events like changes, conflicts, or special notices.
 
-
+![SmartDaro Frontend Preview](previe/smartdaro.jpg)
 
     ✅ Future Enhancements
    
