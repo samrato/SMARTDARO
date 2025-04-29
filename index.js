@@ -11,7 +11,7 @@ const app = express();
 
 const allowedOrigins = [
   "http://localhost:5173", // Add your frontend URL here ni god manze....
-  "https://smartdarofronted.vercel.app/" // If you have a live domain, add it here
+  "https://smartdarofronted.vercel.app" // If you have a live domain, add it here
 ];
 
 app.use(cors({
