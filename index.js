@@ -1,8 +1,10 @@
 const express = require("express");
 const dotenv = require("dotenv");
+const cron = require('node-cron');
 const cors = require("cors");
 const connectDb = require("./database/Db"); 
 const routes = require("./Routes/routes");
+const User=require("./models/user")
 
 dotenv.config();
 
@@ -36,12 +38,24 @@ const PORT = process.env.PORT || 3001;
 // Connect to the database and start the server
 const startServer = async () => {
   try {
-    await connectDb(); // Ensure DB connection before starting the server
+    await connectDb();
+
+    // Cron job running every 15 minutes
+    cron.schedule('*/15 * * * *', async () => {
+      console.log('⏰ Running cron job every 15 minutes');
+      try {
+        const userCount = await User.countDocuments();
+        console.log(`📊 Total users in the database: ${userCount}`);
+      } catch (err) {
+        console.error("❌ Cron job error:", err);
+      }
+    });
+
     app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
+      console.log(`🚀 Server is running on port ${PORT}`);
     });
   } catch (error) {
-    console.error("Server failed to start:", error);
+    console.error("❌ Server failed to start:", error);
   }
 };
 
