@@ -22,25 +22,20 @@ const getCourseByIdController = async (req, res, next) => {
         return res.status(500).json({message:"failed to fetch courses"})
     }
 };
-
 // Add a new course (Admin only)
 const addCourseController = async (req, res, next) => {
     try {
-        // if (!req.user || req.user.role !== "admin") {
-        //     return res.status(403).json({message:"Unauthorize :Admins only"})
-        // }
+        const { name, code, lecturer, creditHours } = req.body;
 
-        const { name, code, instructorId, capacity, duration } = req.body;
-        if (!name || !code || !instructorId || !capacity || !duration) {
-            return res.status(422).json({message:"All fields are required"})
-            
+        if (!name || !code || !lecturer || !creditHours) {
+            return res.status(422).json({ message: "All fields are required" });
         }
 
-        const newCourse = await courseService.createCourse({ name, code, instructorId, capacity, duration });
+        const newCourse = await courseService.createCourse({ name, code, lecturer, creditHours });
         res.status(201).json({ status: "success", course: newCourse });
     } catch (error) {
-        console.error(error)
-        return res.status(500).json({message:"failed to fetch "})
+        console.error(error);
+        return res.status(500).json({ message: "Failed to create course" });
     }
 };
 

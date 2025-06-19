@@ -20,8 +20,8 @@ const getCourseById = async (id) => {
   }
 };
 
-// ✅ Add a new course
-const createCourse = async ({ name, code, lecturerId, creditHours }) => {
+// ✅ Add a new course (Fixed)
+const createCourse = async ({ name, code, lecturer, creditHours }) => {
   try {
     const existingCourse = await Course.findOne({ code });
     if (existingCourse) throw new Error("Course code already exists");
@@ -29,7 +29,7 @@ const createCourse = async ({ name, code, lecturerId, creditHours }) => {
     const course = new Course({
       name,
       code,
-      lecturer: lecturerId,
+      lecturer,
       creditHours,
     });
 
