@@ -23,6 +23,15 @@ const {
 const isAdmin = require("../middleware/UserAdmin");
 const authMiddleware=require("../middleware/authMiddleware")
 
+
+
+const {
+    addLecturer,
+    getAllLecturers,
+    getLecturerById,
+    deleteLecturer,
+  } = require("../controllers/lecturerController");
+
 const router = Router();
 
 // ============= User Authentication Routes =============
@@ -39,17 +48,14 @@ router.post('/venues',authMiddleware, isAdmin, addVenueController);
 router.put('/venues/:venueId',authMiddleware, isAdmin, updateVenueController);
 router.delete('/venues/:venueId', authMiddleware,isAdmin, deleteVenueController);
 
-
-
 // ============= Course Routes (Fixed Conflicts) =============
 
-
-router.get("/", authMiddleware,getAllCoursesController);
-router.get("/:courseId", authMiddleware,getCourseByIdController);
+router.get("/course", authMiddleware,getAllCoursesController);
+router.get("/course/:courseId/", authMiddleware,getCourseByIdController);
 // Admin routes (protected)
-router.post("/", authMiddleware,isAdmin, addCourseController);
-router.put("/:courseId",authMiddleware, isAdmin, updateCourseController);
-router.delete("/:courseId",authMiddleware, isAdmin, deleteCourseController);
+router.post("/add/course/", authMiddleware,isAdmin, addCourseController);
+router.put("/add/:courseId",authMiddleware, isAdmin, updateCourseController);
+router.delete("/add/:courseId",authMiddleware, isAdmin, deleteCourseController);
 
 
 // ============= Course Routes (Fixed Conflicts) =============
@@ -59,8 +65,11 @@ router.get("/id/:id", authMiddleware,getTimetableByIdController);
 router.post("/allocate-ai", authMiddleware,isAdmin, allocateTimetableAIController);
 router.delete("/:id",authMiddleware, isAdmin, deleteTimetableController);
 
-
-
+// ============= Lecture  Routes (Fixed Conflicts) =============
+router.post("/lec", authMiddleware, isAdmin, addLecturer);
+router.get("/lec", authMiddleware, getAllLecturers);
+router.get("/lec/:id", authMiddleware, getLecturerById);
+router.delete("/lec/:id", authMiddleware, isAdmin, deleteLecturer);
 
 
 module.exports = router;

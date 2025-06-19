@@ -26,9 +26,9 @@ const getCourseByIdController = async (req, res, next) => {
 // Add a new course (Admin only)
 const addCourseController = async (req, res, next) => {
     try {
-        if (!req.user || req.user.role !== "admin") {
-            return res.status(403).json({message:"Unauthorize :Admins only"})
-        }
+        // if (!req.user || req.user.role !== "admin") {
+        //     return res.status(403).json({message:"Unauthorize :Admins only"})
+        // }
 
         const { name, code, instructorId, capacity, duration } = req.body;
         if (!name || !code || !instructorId || !capacity || !duration) {

@@ -1,4 +1,6 @@
 const express = require("express");
+const mongoose = require("mongoose");
+
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
@@ -91,25 +93,29 @@ const loginUser = async (req, res, next) => {
 
 // ================== GET USER BY ID ==================
 //========== GET : api/users/:userId (Protected)
+
 const getUser = async (req, res, next) => {
     try {
         const { userId } = req.params;
+
+        // Validate userId format
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ message: "Invalid user ID format" });
+        }
+
         const user = await User.findById(userId).select("-password");
 
         if (!user) {
-            return res.status(404).json({message:"User not found"})
-            
+            return res.status(404).json({ message: "User not found" });
         }
 
-        res.json({ status: "success", user });
+        res.status(200).json({ status: "success", user });
 
     } catch (error) {
         console.error("Get User Error:", error);
-        return res.status(500).json({message:"Could not retrive user"})
-       
+        return res.status(500).json({ message: "Could not retrieve user" });
     }
 };
-
 // ================== UPDATE USER PREFERENCES ==================
 //========== PUT : api/users/:userId (Protected)
 const updateUser = async (req, res, next) => {
