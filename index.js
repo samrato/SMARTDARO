@@ -4,17 +4,18 @@ const cron = require('node-cron');
 
 const cors = require("cors");
 const connectDb = require("./database/Db"); 
-const routes = require("./Routes/routes");
-const User=require("./models/user")
+const userRoutes = require("./Routes/userRoutes");
+const venueRoutes = require("./Routes/venueRoutes");
+const courseRoutes = require("./Routes/courseRoutes");
+const timetableRoutes = require("./Routes/timetableRoutes");
 
 dotenv.config();
 
 const app = express();
 
-
 const allowedOrigins = [
-  "http://localhost:5173", // Add your frontend URL here ni god manze....
-  "https://smartdarofronted.vercel.app" // If you have a live domain, add it here
+  "http://localhost:5173",
+  "https://smartdarofronted.vercel.app"
 ];
 
 app.use(cors({
@@ -25,14 +26,15 @@ app.use(cors({
           callback(new Error("Not allowed by CORS"));
       }
   },
-  credentials: true, // Allows cookies and credentials to be sent with requests
+  credentials: true,
 }));
 
-// Middleware
-app.use(express.json()); // Should be placed before routes
+app.use(express.json());
 
-// Routes
-app.use('/api', routes);
+app.use('/api/users', userRoutes);
+app.use('/api/venues', venueRoutes);
+app.use('/api/courses', courseRoutes);
+app.use('/api/timetables', timetableRoutes);
 
 const PORT = process.env.PORT || 3001;
 

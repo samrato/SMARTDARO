@@ -1,7 +1,7 @@
 
 const express = require("express");
 const HttpError = require('../models/errorModel');
-const venueService = require('../service/venuService');
+const venueService = require('../service/venueService');
 
 // Get all venues (Accessible to everyone)
 const getAllVenuesController = async (req, res, next) => {
