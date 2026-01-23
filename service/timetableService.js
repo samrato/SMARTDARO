@@ -19,6 +19,21 @@ class TimetableService {
     async deleteTimetable(id) {
         return await Timetable.findByIdAndDelete(id);
     }
+
+    async getTimetableForUser(userId, userRole) {
+        let query = {};
+        if (userRole === 'instructor') {
+            query = { instructor: userId };
+        } else if (userRole === 'student') {
+            const enrolledCourses = await Course.find({ students: userId }).select('_id');
+            const courseIds = enrolledCourses.map(course => course._id);
+            query = { course: { $in: courseIds } };
+        } else {
+            return [];
+        }
+
+        return await Timetable.find(query).populate('course venue instructor');
+    }
 }
 
 module.exports = new TimetableService();

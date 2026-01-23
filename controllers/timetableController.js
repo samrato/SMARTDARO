@@ -52,9 +52,32 @@ const deleteTimetableController = async (req, res, next) => {
     }
 };
 
+const getUserTimetableController = async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        const userRole = req.user.role;
+
+        if (!userId || !userRole) {
+            return res.status(401).json({ message: "Unauthorized: User ID or role not found." });
+        }
+
+        const timetables = await timetableService.getTimetableForUser(userId, userRole);
+
+        if (!timetables || timetables.length === 0) {
+            return res.status(404).json({ message: "No timetable found for this user." });
+        }
+
+        res.json({ status: 'success', timetables });
+    } catch (error) {
+        console.error("Error retrieving user timetable:", error);
+        return res.status(500).json({ message: "Failed to fetch user timetable." });
+    }
+};
+
 module.exports = {
     allocateTimetableAIController,
     getTimetableByDayController,
     getTimetableByIdController,
     deleteTimetableController,
+    getUserTimetableController,
 };
