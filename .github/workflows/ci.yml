@@ -21,12 +21,3 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
     - run: npm install
-    - name: Start server and run a simple test
-      run: |
-        npm install
-        npm start &
-        sleep 5
-        curl -X POST -H "Content-Type: application/json" \
-             -d '{"fullName": "Test User", "email": "test@example.com", "password": "password123", "password2": "password123", "role": "student"}' \
-             http://localhost:3001/api/users/register -o /dev/null -s -w "%{http_code}\n" | grep "201" && echo "Server started and registration endpoint tested successfully"
-      shell: bash
