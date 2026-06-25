@@ -1,53 +1,345 @@
-### API Documentation
+# SmartDaro Backend API Specification
 
-This document provides a detailed description of the SmartDaro API endpoints.
+This document provides a detailed description of the SmartDaro API endpoints, request bodies, required headers, security constraints, and response schemas.
 
 **Base URL:** `/api`
 
 ---
 
-### Authentication
+## Headers & Security Context
 
-| Method | Endpoint      | Description        | Request Body                  | Response (Success)                                                                 | Response (Error)                                       |
-| ------ | ------------- | ------------------ | ----------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| POST   | `/users/register` | Register a new user | `{ "fullName", "email", "password" }` | `{ "message": "User registered successfully" }`                                    | `{ "message": "User already exists" }`                 |
-| POST   | `/users/login`    | Login a user       | `{ "email", "password" }`       | `{ "token": "JWT_TOKEN", "user": { "id", "fullName", "email", "isAdmin" } }` | `{ "message": "Invalid credentials" }`                 |
-| GET    | `/users/:userId`  | Get user details   | (none)                        | `{ "id", "fullName", "email", "isAdmin" }`                                         | `{ "message": "User not found" }`                      |
-| PUT    | `/users/:userId`  | Update user details| `{ "fullName", "email" }`     | `{ "message": "User updated successfully" }`                                       | `{ "message": "User not found" }`                      |
+All protected endpoints require the following headers for authorization and tenant isolation:
 
----
-
-### Venues
-
-| Method | Endpoint         | Description           | Authorization | Request Body                  | Response (Success)                | Response (Error)                    |
-| ------ | ---------------- | --------------------- | ------------- | ----------------------------- | --------------------------------- | ----------------------------------- |
-| GET    | `/venues`        | Get all venues        | Bearer Token  | (none)                        | `[{ "id", "name", "capacity", "location", "isAvailable" }]` | (none)                              |
-| GET    | `/venues/:venueId` | Get a specific venue  | Bearer Token  | (none)                        | `{ "id", "name", "capacity", "location", "isAvailable" }` | `{ "message": "Venue not found" }`  |
-| POST   | `/venues`        | Add a new venue       | Admin         | `{ "name", "capacity", "location" }` | `{ "message": "Venue added successfully" }` | `{ "message": "Invalid data" }`     |
-| PUT    | `/venues/:venueId` | Update a venue        | Admin         | `{ "name", "capacity", "location" }` | `{ "message": "Venue updated successfully" }` | `{ "message": "Venue not found" }`  |
-| DELETE | `/venues/:venueId` | Delete a venue        | Admin         | (none)                        | `{ "message": "Venue deleted successfully" }` | `{ "message": "Venue not found" }`  |
+| Header Name | Type | Description | Required For |
+| :--- | :--- | :--- | :--- |
+| `Authorization` | String | JWT bearer token in format `Bearer <token>` | All protected endpoints |
+| `x-tenant-id` | UUID | The tenant identifier associated with the request | Multi-tenant isolated endpoints |
 
 ---
 
-### Courses
+## 1. Authentication & Users
 
-| Method | Endpoint          | Description            | Authorization | Request Body                                     | Response (Success)                  | Response (Error)                     |
-| ------ | ----------------- | ---------------------- | ------------- | ------------------------------------------------ | ----------------------------------- | ------------------------------------ |
-| GET    | `/courses`        | Get all courses        | Bearer Token  | (none)                                           | `[{ "id", "name", "code", "instructor", "students", "creditHours" }]` | (none)                               |
-| GET    | `/courses/:courseId`| Get a specific course  | Bearer Token  | (none)                                           | `{ "id", "name", "code", "instructor", "students", "creditHours" }` | `{ "message": "Course not found" }`  |
-| POST   | `/courses`        | Add a new course       | Admin         | `{ "name", "code", "instructor", "creditHours" }` | `{ "message": "Course added successfully" }` | `{ "message": "Invalid data" }`      |
-| PUT    | `/courses/:courseId`| Update a course        | Admin         | `{ "name", "code", "instructor", "creditHours" }` | `{ "message": "Course updated successfully" }` | `{ "message": "Course not found" }`  |
-| DELETE | `/courses/:courseId`| Delete a course        | Admin         | (none)                                           | `{ "message": "Course deleted successfully" }` | `{ "message": "Course not found" }`  |
+### Register User
+* **Method & Path:** `POST /users/register`
+* **Access:** Public (Restriction: Roles `admin` and `instructor` require existing admin token auth if an administrator already exists in the system)
+* **Request Headers:**
+  * `x-tenant-id`: UUID (Optional, defaults to institutional default)
+* **Request Body:**
+```json
+{
+  "fullName": "Dr. Jane Smith",
+  "email": "jane.smith@smartdaro.edu",
+  "password": "securepassword",
+  "password2": "securepassword",
+  "role": "instructor"
+}
+```
+* **Success Response (201 Created):**
+```json
+{
+  "message": "User Dr. Jane Smith registered successfully"
+}
+```
+* **Error Response (403 Forbidden):**
+```json
+{
+  "message": "Only administrators can create admin or instructor accounts"
+}
+```
+
+### Login User
+* **Method & Path:** `POST /users/login`
+* **Access:** Public
+* **Request Body:**
+```json
+{
+  "email": "jane.smith@smartdaro.edu",
+  "password": "securepassword"
+}
+```
+* **Success Response (200 OK):**
+```json
+{
+  "token": "JWT_TOKEN",
+  "userId": "UUID",
+  "role": "instructor",
+  "isAdmin": false,
+  "tenantId": "UUID"
+}
+```
+
+### Get User Preferences
+* **Method & Path:** `GET /users/:userId`
+* **Access:** Authenticated (Tenant Isolated)
+* **Success Response (200 OK):**
+```json
+{
+  "status": "success",
+  "user": {
+    "id": "UUID",
+    "fullName": "Dr. Jane Smith",
+    "email": "jane.smith@smartdaro.edu",
+    "isAdmin": false,
+    "role": "instructor",
+    "tenantId": "UUID",
+    "preferences": {}
+  }
+}
+```
 
 ---
 
-### Timetables
+## 2. Academic Catalog
 
-| Method | Endpoint               | Description                  | Authorization | Request Body | Response (Success)                                                              | Response (Error)                       |
-| ------ | ---------------------- | ---------------------------- | ------------- | ------------ | ------------------------------------------------------------------------------- | -------------------------------------- |
-| POST   | `/timetables/allocate-ai` | Generate timetable using AI    | Admin         | (none)       | `{ "status": "success", "timetable": [...] }`                                     | `{ "message": "Failed to allocate timetable" }` |
-| GET    | `/timetables/:day`     | Get timetable for a day      | Bearer Token  | (none)       | `[{ "id", "course", "venue", "instructor", "students", "day", "startTime", "endTime" }]` | `{ "message": "No timetable found" }`   |
-| GET    | `/timetables/id/:id`   | Get a specific timetable     | Bearer Token  | (none)       | `{ "id", "course", "venue", "instructor", "students", "day", "startTime", "endTime" }` | `{ "message": "Timetable not found" }`  |
-| DELETE | `/timetables/:id`      | Delete a timetable entry     | Admin         | (none)       | `{ "message": "Timetable entry deleted successfully" }`                         | `{ "message": "Timetable not found" }`  |
+### Create Faculty
+* **Method & Path:** `POST /academic-catalogs/faculties`
+* **Access:** Admin
+* **Request Body:**
+```json
+{
+  "name": "Faculty of Engineering",
+  "code": "ENG"
+}
+```
+* **Success Response (201 Created):**
+```json
+{
+  "status": "success",
+  "faculty": {
+    "id": "UUID",
+    "tenant_id": "UUID",
+    "name": "Faculty of Engineering",
+    "code": "ENG",
+    "created_at": "TIMESTAMP"
+  }
+}
+```
+
+### List Faculties
+* **Method & Path:** `GET /academic-catalogs/faculties`
+* **Access:** Authenticated (Tenant Isolated)
+* **Success Response (200 OK):**
+```json
+{
+  "status": "success",
+  "faculties": [ ... ]
+}
+```
+
+### Create Department
+* **Method & Path:** `POST /academic-catalogs/departments`
+* **Access:** Admin
+* **Request Body:**
+```json
+{
+  "facultyId": "UUID",
+  "name": "Department of Computer Science",
+  "code": "CS"
+}
+```
+* **Success Response (201 Created):**
+```json
+{
+  "status": "success",
+  "department": {
+    "id": "UUID",
+    "tenant_id": "UUID",
+    "faculty_id": "UUID",
+    "name": "Department of Computer Science",
+    "code": "CS",
+    "created_at": "TIMESTAMP"
+  }
+}
+```
+
+### List Departments
+* **Method & Path:** `GET /academic-catalogs/departments`
+* **Access:** Authenticated (Tenant Isolated)
+* **Query Parameters:**
+  * `facultyId`: UUID (Optional)
+* **Success Response (200 OK):**
+```json
+{
+  "status": "success",
+  "departments": [ ... ]
+}
+```
 
 ---
+
+## 3. Venues & Courses
+
+### List Venues
+* **Method & Path:** `GET /venues`
+* **Access:** Authenticated (Tenant Isolated)
+* **Success Response (200 OK):**
+```json
+{
+  "status": "success",
+  "venues": [
+    {
+      "id": "UUID",
+      "name": "Auditorium CS-A",
+      "capacity": 100,
+      "location": "Building CS",
+      "isAvailable": true
+    }
+  ]
+}
+```
+
+### Create Course
+* **Method & Path:** `POST /courses`
+* **Access:** Admin
+* **Request Body:**
+```json
+{
+  "name": "Operating Systems",
+  "code": "CS302",
+  "instructorId": "UUID",
+  "capacity": 80,
+  "duration": 2
+}
+```
+* **Success Response (201 Created):**
+```json
+{
+  "status": "success",
+  "course": {
+    "id": "UUID",
+    "name": "Operating Systems",
+    "code": "CS302",
+    "capacity": 80,
+    "duration": 2,
+    "instructorId": "UUID"
+  }
+}
+```
+
+---
+
+## 4. Timetable Management
+
+### AI Allocate Timetable
+* **Method & Path:** `POST /timetables/allocate-ai`
+* **Access:** Admin (Tenant Isolated)
+* **Request Body:**
+```json
+{
+  "sessionId": "UUID"
+}
+```
+* **Success Response (202 Accepted):**
+```json
+{
+  "status": "queued",
+  "message": "Timetable generation has been enqueued asynchronously.",
+  "jobId": 1
+}
+```
+
+### List Timetables by Day
+* **Method & Path:** `GET /timetables/:day`
+* **Access:** Authenticated (Tenant & Cache Scoped)
+* **Success Response (200 OK):**
+```json
+{
+  "status": "success",
+  "timetables": [
+    {
+      "id": "UUID",
+      "tenant_id": "UUID",
+      "timetable_version_id": "UUID",
+      "course_id": "UUID",
+      "room_id": "UUID",
+      "lecturer_id": "UUID",
+      "day_of_week": "MONDAY",
+      "start_time": 8,
+      "end_time": 10
+    }
+  ]
+}
+```
+
+---
+
+## 5. Examination Management
+
+### Create Exam
+* **Method & Path:** `POST /exams`
+* **Access:** Admin
+* **Request Body:**
+```json
+{
+  "academicSessionId": "UUID",
+  "courseId": "UUID",
+  "type": "MAIN",
+  "examDate": "2026-12-10",
+  "startTime": 9,
+  "endTime": 12
+}
+```
+* **Success Response (201 Created):**
+```json
+{
+  "status": "success",
+  "exam": {
+    "id": "UUID",
+    "tenant_id": "UUID",
+    "academic_session_id": "UUID",
+    "course_id": "UUID",
+    "type": "MAIN",
+    "exam_date": "2026-12-10",
+    "start_time": 9,
+    "end_time": 12
+  }
+}
+```
+
+### Allocate Room for Exam
+* **Method & Path:** `POST /exams/allocate-room`
+* **Access:** Admin (Enforces room capacity & collision validations)
+* **Request Body:**
+```json
+{
+  "examId": "UUID",
+  "roomId": "UUID",
+  "seatingCapacity": 60
+}
+```
+* **Success Response (201 Created):**
+```json
+{
+  "status": "success",
+  "allocation": {
+    "id": "UUID",
+    "tenant_id": "UUID",
+    "exam_id": "UUID",
+    "room_id": "UUID",
+    "seating_capacity": 60
+  }
+}
+```
+
+### Assign Invigilator
+* **Method & Path:** `POST /exams/assign-invigilator`
+* **Access:** Admin (Enforces instructor scheduling conflict validations)
+* **Request Body:**
+```json
+{
+  "examAllocationId": "UUID",
+  "invigilatorId": "UUID"
+}
+```
+* **Success Response (201 Created):**
+```json
+{
+  "status": "success",
+  "assignment": {
+    "id": "UUID",
+    "tenant_id": "UUID",
+    "exam_allocation_id": "UUID",
+    "invigilator_id": "UUID"
+  }
+}
+```
