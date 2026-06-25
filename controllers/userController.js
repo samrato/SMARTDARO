@@ -30,7 +30,7 @@ const registerUser = async (req, res, next) => {
         }
 
         if (password.trim().length < 6) {
-            return res.status(422).js({message:"Password must be at least 6 characters"})
+            return res.status(422).json({message:"Password must be at least 6 characters"})
 
         }
 
@@ -42,11 +42,9 @@ const registerUser = async (req, res, next) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         // Determine the role for the new user. Default to 'student' if not provided or invalid.
-        // For security, 'admin' and 'instructor' roles should typically not be set via public registration.
         const userRole = ['admin', 'instructor', 'student'].includes(role) ? role : 'student';
 
-        // This isAdmin logic needs review - it's hardcoded and might be better handled by an admin interface.
-        let isAdmin = newEmail === "onyangojuma984@gmail.com";
+        let isAdmin = userRole === 'admin';
 
         const newUser = await User.create({ fullName, email: newEmail, password: hashedPassword, role: userRole, isAdmin }); // Assign the determined role
 
@@ -83,10 +81,10 @@ const loginUser = async (req, res, next) => {
             return res.status(422).json({message:"Invalid credentials"})
         }
 
-        // Include user's role in the token payload and response
-        const token = generateToken({ id: user._id, role: user.role });
+        // Include user's role, isAdmin, and tenantId flag in the token payload and response
+        const token = generateToken({ id: user._id, role: user.role, isAdmin: user.isAdmin, tenantId: user.tenantId });
 
-        res.json({ token, userId: user._id, role: user.role }); // Return role in response too
+        res.json({ token, userId: user._id, role: user.role, isAdmin: user.isAdmin, tenantId: user.tenantId }); // Return role in response too
 
     } catch (error) {
         console.error("Login Error:", error);

@@ -1,17 +1,37 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const cron = require('node-cron');
-
 const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
+
 const connectDb = require("./database/Db"); 
+const User = require("./models/user");
 const userRoutes = require("./Routes/userRoutes");
 const venueRoutes = require("./Routes/venueRoutes");
 const courseRoutes = require("./Routes/courseRoutes");
 const timetableRoutes = require("./Routes/timetableRoutes");
+const academicSessionRoutes = require("./Routes/academicSessionRoutes");
+const lecturerConstraintRoutes = require("./Routes/lecturerConstraintRoutes");
+const courseStreamRoutes = require("./Routes/courseStreamRoutes");
+const studentRegistrationRoutes = require("./Routes/studentRegistrationRoutes");
 
 dotenv.config();
 
 const app = express();
+
+// Secure HTTP headers
+app.use(helmet());
+
+// Apply rate limiting: Max 100 requests per 15 minutes per IP
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, 
+  max: 100, 
+  message: { message: "Too many requests, please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use("/api", limiter);
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -35,6 +55,10 @@ app.use('/api/users', userRoutes);
 app.use('/api/venues', venueRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/timetables', timetableRoutes);
+app.use('/api/academic-sessions', academicSessionRoutes);
+app.use('/api/lecturer-constraints', lecturerConstraintRoutes);
+app.use('/api/course-streams', courseStreamRoutes);
+app.use('/api/student-registrations', studentRegistrationRoutes);
 
 const PORT = process.env.PORT || 3001;
 
@@ -42,6 +66,11 @@ const PORT = process.env.PORT || 3001;
 const startServer = async () => {
   try {
     await connectDb();
+
+    // Verify PostgreSQL connection
+    const pgDb = require("./database/pgDb");
+    await pgDb.query("SELECT 1");
+    console.log("✅ PostgreSQL is connected successfully");
 
     // Cron job running every 15 minutes
     cron.schedule('*/15 * * * *', async () => {
@@ -59,6 +88,7 @@ const startServer = async () => {
     });
   } catch (error) {
     console.error("❌ Server failed to start:", error);
+    process.exit(1);
   }
 };
 

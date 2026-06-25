@@ -26,10 +26,6 @@ const getCourseByIdController = async (req, res, next) => {
 // Add a new course (Admin only)
 const addCourseController = async (req, res, next) => {
     try {
-        if (!req.user || req.user.role !== "admin") {
-            return res.status(403).json({message:"Unauthorize :Admins only"})
-        }
-
         const { name, code, instructorId, capacity, duration } = req.body;
         if (!name || !code || !instructorId || !capacity || !duration) {
             return res.status(422).json({message:"All fields are required"})
@@ -47,10 +43,6 @@ const addCourseController = async (req, res, next) => {
 // Update course (Admin only)
 const updateCourseController = async (req, res, next) => {
     try {
-        if (!req.user || req.user.role !== "admin") {
-            return res.status(403).json({message:"Unauthorize :Admins only"})
-        }
-
         const updatedCourse = await courseService.updateCourse(req.params.courseId, req.body);
         res.json({ status: "success", course: updatedCourse });
     } catch (error) {
@@ -62,10 +54,6 @@ const updateCourseController = async (req, res, next) => {
 // Delete course (Admin only)
 const deleteCourseController = async (req, res, next) => {
     try {
-        if (!req.user || req.user.role !== "admin") {
-            return res.status(403).json({message:"Unauthorize :Admins only"})
-        }
-
         await courseService.deleteCourse(req.params.courseId);
         res.json({ status: "success", message: "Course deleted successfully" });
     } catch (error) {

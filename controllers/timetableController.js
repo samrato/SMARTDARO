@@ -1,18 +1,75 @@
 const timetableService = require("../service/timetableService");
 const alertService = require('../service/alertService');
+const { timetableQueue } = require('../service/queueService');
 const User = require('../models/user');
+const db = require('../database/pgDb');
 
 const allocateTimetableAIController = async (req, res, next) => {
+    const { sessionId } = req.body;
+    if (!sessionId) {
+        return res.status(422).json({ message: "Academic session ID is required" });
+    }
+
     try {
-        const timetable = await timetableService.generateTimetable();
-        const users = await User.find();
-        users.forEach(user => {
-            alertService.sendAlert(user, 'A new timetable has been generated.');
+        const job = await timetableQueue.add('generate-timetable', { 
+            sessionId, 
+            userId: req.user ? req.user.id : "system" 
         });
-        res.status(201).json({ status: 'success', timetable });
+
+        res.status(202).json({ 
+            status: 'queued', 
+            message: 'Timetable generation has been enqueued asynchronously.', 
+            jobId: job.id 
+        });
     } catch (error) {
-        console.error("Error allocating AI timetable:", error);
-        return res.status(500).json({ message: "Failed to allocate timetable " });
+        console.error("Error enqueuing timetable job:", error);
+        return res.status(500).json({ message: "Failed to enqueue timetable job" });
+    }
+};
+
+const publishTimetableController = async (req, res, next) => {
+    const { sessionId } = req.params;
+    const tenantId = req.tenantId;
+
+    try {
+        const result = await db.query(
+            `UPDATE timetable_versions 
+             SET status = 'PUBLISHED' 
+             WHERE academic_session_id = $1 AND tenant_id = $2`,
+            [sessionId, tenantId]
+        );
+
+        res.json({ 
+            status: 'success', 
+            message: `Successfully published timetable for session ${sessionId}.`
+        });
+    } catch (error) {
+        console.error("Error publishing timetable:", error);
+        return res.status(500).json({ message: "Failed to publish timetable" });
+    }
+};
+
+const lockTimetableController = async (req, res, next) => {
+    const { allocationId } = req.params;
+    const { lockReason } = req.body;
+    const userId = req.user ? req.user.id : 'admin';
+
+    try {
+        const result = await db.query(
+            `UPDATE timetable_allocations 
+             SET locked_by = $1, locked_at = NOW(), lock_reason = $2 
+             WHERE id = $3 RETURNING *`,
+            [userId, lockReason || "Manual lock override", allocationId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "Timetable allocation not found" });
+        }
+
+        res.json({ status: 'success', allocation: result.rows[0] });
+    } catch (error) {
+        console.error("Error locking allocation:", error);
+        return res.status(500).json({ message: "Failed to lock allocation" });
     }
 };
 
@@ -76,6 +133,8 @@ const getUserTimetableController = async (req, res, next) => {
 
 module.exports = {
     allocateTimetableAIController,
+    publishTimetableController,
+    lockTimetableController,
     getTimetableByDayController,
     getTimetableByIdController,
     deleteTimetableController,
