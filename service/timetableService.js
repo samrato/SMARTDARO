@@ -74,6 +74,18 @@ class TimetableService {
             { startTime: 15, endTime: 17 }
         ];
 
+        const registrationsRes = await db.query(
+            "SELECT student_id, unit_id FROM student_registrations WHERE tenant_id = $1 AND session_id = $2 AND registration_status = 'REGISTERED'",
+            [tenantId, sessionId]
+        );
+        const courseStudents = {};
+        for (const reg of registrationsRes.rows) {
+            if (!courseStudents[reg.unit_id]) {
+                courseStudents[reg.unit_id] = new Set();
+            }
+            courseStudents[reg.unit_id].add(reg.student_id);
+        }
+
         const allocations = [];
 
         // Fetch constraints for this tenant
@@ -120,6 +132,25 @@ class TimetableService {
                                 .reduce((sum, a) => sum + (a.endTime - a.startTime), 0);
                             if (lecturerHours + (slot.endTime - slot.startTime) > maxHours) continue;
                         }
+
+                        // Student clash check (prevent scheduling overlapping classes for students registered in both)
+                        const currentCourseStudents = courseStudents[course.id] || new Set();
+                        let studentConflict = false;
+                        if (currentCourseStudents.size > 0) {
+                            for (const alloc of allocations) {
+                                if (alloc.dayOfWeek === day && alloc.startTime === slot.startTime) {
+                                    const otherCourseStudents = courseStudents[alloc.courseUnitId] || new Set();
+                                    for (const studId of currentCourseStudents) {
+                                        if (otherCourseStudents.has(studId)) {
+                                            studentConflict = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (studentConflict) break;
+                            }
+                        }
+                        if (studentConflict) continue;
 
                         // If all checks pass, record allocation!
                         allocations.push({

@@ -13,6 +13,8 @@ const academicSessionRoutes = require("./Routes/academicSessionRoutes");
 const lecturerConstraintRoutes = require("./Routes/lecturerConstraintRoutes");
 const courseStreamRoutes = require("./Routes/courseStreamRoutes");
 const studentRegistrationRoutes = require("./Routes/studentRegistrationRoutes");
+const academicCatalogRoutes = require("./Routes/academicCatalogRoutes");
+const examRoutes = require("./Routes/examRoutes");
 
 dotenv.config();
 
@@ -57,6 +59,8 @@ app.use('/api/academic-sessions', academicSessionRoutes);
 app.use('/api/lecturer-constraints', lecturerConstraintRoutes);
 app.use('/api/course-streams', courseStreamRoutes);
 app.use('/api/student-registrations', studentRegistrationRoutes);
+app.use('/api/academic-catalogs', academicCatalogRoutes);
+app.use('/api/exams', examRoutes);
 
 const PORT = process.env.PORT || 3001;
 
