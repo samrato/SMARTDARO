@@ -1,13 +1,17 @@
 const db = require('../database/pgDb');
 
 class TimetableService {
-    async generateTimetable(sessionId, userId) {
+    async generateTimetable(sessionId, userId, adminTenantId) {
         // Fetch academic session to check tenant ID
         const sessionRes = await db.query('SELECT tenant_id FROM academic_sessions WHERE id = $1', [sessionId]);
         if (sessionRes.rows.length === 0) {
             throw new Error("Academic session not found");
         }
         const tenantId = sessionRes.rows[0].tenant_id;
+
+        if (adminTenantId && tenantId !== adminTenantId) {
+            throw new Error("Academic session does not belong to your tenant");
+        }
 
         // Find or create timetable version
         let versionRes = await db.query(
@@ -72,8 +76,8 @@ class TimetableService {
 
         const allocations = [];
 
-        // Fetch constraints
-        const constraintsRes = await db.query('SELECT * FROM lecturer_constraints');
+        // Fetch constraints for this tenant
+        const constraintsRes = await db.query('SELECT * FROM lecturer_constraints WHERE tenant_id = $1', [tenantId]);
         const lecturerConstraints = constraintsRes.rows;
 
         // Step 3: Constraint solving algorithm (evaluating resource collisions)
@@ -120,7 +124,7 @@ class TimetableService {
                         // If all checks pass, record allocation!
                         allocations.push({
                             courseUnitId: course.id,
-                            tenantId: course.tenant_id,
+                            tenantId: tenantId,
                             roomId: room.id,
                             lecturerId: course.lecturer_id,
                             dayOfWeek: day,
@@ -161,43 +165,43 @@ class TimetableService {
         return allocations;
     }
 
-    async getTimetableByDay(day) {
+    async getTimetableByDay(day, tenantId) {
         const result = await db.query(
-            'SELECT * FROM timetable_allocations WHERE day_of_week = $1',
-            [day.toUpperCase()]
+            'SELECT * FROM timetable_allocations WHERE day_of_week = $1 AND tenant_id = $2',
+            [day.toUpperCase(), tenantId]
         );
         return result.rows;
     }
 
-    async getTimetableById(id) {
+    async getTimetableById(id, tenantId) {
         const result = await db.query(
-            'SELECT * FROM timetable_allocations WHERE id = $1',
-            [id]
+            'SELECT * FROM timetable_allocations WHERE id = $1 AND tenant_id = $2',
+            [id, tenantId]
         );
         return result.rows[0];
     }
 
-    async deleteTimetable(id) {
+    async deleteTimetable(id, tenantId) {
         return await db.query(
-            'DELETE FROM timetable_allocations WHERE id = $1',
-            [id]
+            'DELETE FROM timetable_allocations WHERE id = $1 AND tenant_id = $2',
+            [id, tenantId]
         );
     }
 
-    async getTimetableForUser(userId, userRole) {
+    async getTimetableForUser(userId, userRole, tenantId) {
         let queryText = '';
         let params = [];
 
         if (userRole === 'instructor') {
-            queryText = 'SELECT * FROM timetable_allocations WHERE lecturer_id = $1';
-            params = [userId];
+            queryText = 'SELECT * FROM timetable_allocations WHERE lecturer_id = $1 AND tenant_id = $2';
+            params = [userId, tenantId];
         } else if (userRole === 'student') {
             queryText = `
                 SELECT ta.* FROM timetable_allocations ta
                 JOIN student_registrations sr ON sr.unit_id = ta.course_id
-                WHERE sr.student_id = $1
+                WHERE sr.student_id = $1 AND ta.tenant_id = $2 AND sr.tenant_id = $2
             `;
-            params = [userId];
+            params = [userId, tenantId];
         } else {
             return [];
         }

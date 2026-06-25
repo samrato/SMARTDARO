@@ -39,13 +39,13 @@ const startWorker = () => {
             }
 
             const job = pickJobRes.rows[0];
-            const { sessionId, userId } = job.payload;
+            const { sessionId, userId, tenantId } = job.payload;
 
-            console.log(`[Worker] Starting async timetable generation for job ${job.id}, session ${sessionId}, triggered by ${userId}`);
+            console.log(`[Worker] Starting async timetable generation for job ${job.id}, session ${sessionId}, tenant ${tenantId}, triggered by ${userId}`);
             alertService.sendAlert({ email: "admin@smartdaro.edu" }, `Timetable generation started for session ${sessionId}`);
 
             try {
-                const timetable = await timetableService.generateTimetable(sessionId, userId);
+                const timetable = await timetableService.generateTimetable(sessionId, userId, tenantId);
                 
                 // Mark job as completed
                 await db.query(

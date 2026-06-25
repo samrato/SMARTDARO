@@ -5,13 +5,14 @@ const cache = require("../service/redisService");
 // Get all courses (Public)
 const getAllCoursesController = async (req, res, next) => {
     try {
-        const cacheKey = "courses:all";
+        const tenantId = req.tenantId;
+        const cacheKey = `courses:${tenantId}:all`;
         const cached = await cache.getCache(cacheKey);
         if (cached) {
             return res.json({ status: "success", courses: cached, source: "cache" });
         }
 
-        const courses = await courseService.getAllCourses();
+        const courses = await courseService.getAllCourses(tenantId);
         await cache.setCache(cacheKey, courses, 300); // 5 min TTL
         res.json({ status: "success", courses });
     } catch (error) {
@@ -24,13 +25,14 @@ const getAllCoursesController = async (req, res, next) => {
 const getCourseByIdController = async (req, res, next) => {
     try {
         const { courseId } = req.params;
-        const cacheKey = `courses:id:${courseId}`;
+        const tenantId = req.tenantId;
+        const cacheKey = `courses:${tenantId}:id:${courseId}`;
         const cached = await cache.getCache(cacheKey);
         if (cached) {
             return res.json({ status: "success", course: cached, source: "cache" });
         }
 
-        const course = await courseService.getCourseById(courseId);
+        const course = await courseService.getCourseById(courseId, tenantId);
         await cache.setCache(cacheKey, course, 300);
         res.json({ status: "success", course });
     } catch (error) {
@@ -38,16 +40,18 @@ const getCourseByIdController = async (req, res, next) => {
     }
 };
 
-// Add a new course (Admin only)
+// Add course (Admin only)
 const addCourseController = async (req, res, next) => {
     try {
         const { name, code, instructorId, capacity, duration } = req.body;
+        const tenantId = req.tenantId;
+
         if (!name || !code || !instructorId || !capacity || !duration) {
             return res.status(422).json({ message: "All fields are required" });
         }
 
-        const newCourse = await courseService.createCourse({ name, code, instructorId, capacity, duration });
-        await cache.clearPattern("courses:*");
+        const newCourse = await courseService.createCourse({ tenantId, name, code, instructorId, capacity, duration });
+        await cache.clearPattern(`courses:${tenantId}:*`);
         res.status(201).json({ status: "success", course: newCourse });
     } catch (error) {
         console.error(error);
@@ -59,8 +63,9 @@ const addCourseController = async (req, res, next) => {
 const updateCourseController = async (req, res, next) => {
     try {
         const { courseId } = req.params;
-        const updatedCourse = await courseService.updateCourse(courseId, req.body);
-        await cache.clearPattern("courses:*");
+        const tenantId = req.tenantId;
+        const updatedCourse = await courseService.updateCourse(courseId, tenantId, req.body);
+        await cache.clearPattern(`courses:${tenantId}:*`);
         res.json({ status: "success", course: updatedCourse });
     } catch (error) {
         console.error(error);
@@ -72,8 +77,9 @@ const updateCourseController = async (req, res, next) => {
 const deleteCourseController = async (req, res, next) => {
     try {
         const { courseId } = req.params;
-        await courseService.deleteCourse(courseId);
-        await cache.clearPattern("courses:*");
+        const tenantId = req.tenantId;
+        await courseService.deleteCourse(courseId, tenantId);
+        await cache.clearPattern(`courses:${tenantId}:*`);
         res.json({ status: "success", message: "Course deleted successfully" });
     } catch (error) {
         console.error(error);
@@ -81,7 +87,6 @@ const deleteCourseController = async (req, res, next) => {
     }
 };
 
-// Export the controllers using CommonJS
 module.exports = {
     getAllCoursesController,
     getCourseByIdController,

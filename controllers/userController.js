@@ -35,9 +35,30 @@ const registerUser = async (req, res, next) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        const userRole = ['admin', 'instructor', 'student'].includes(role) ? role : 'student';
+        const adminCheck = await db.query("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
+        
+        let userRole = 'student';
+        if (role && ['admin', 'instructor'].includes(role)) {
+            if (adminCheck.rows.length > 0) {
+                let requestingUser = null;
+                const authHeader = req.headers.authorization || req.headers.Authorization;
+                if (authHeader && authHeader.startsWith("Bearer ")) {
+                    const token = authHeader.split(" ")[1];
+                    try {
+                        requestingUser = jwt.verify(token, process.env.JWT_SECRET);
+                    } catch (err) {
+                        // ignore
+                    }
+                }
+                if (!requestingUser || !requestingUser.isAdmin) {
+                    return res.status(403).json({ message: "Only administrators can create admin or instructor accounts" });
+                }
+            }
+            userRole = role;
+        }
+
         const isAdmin = userRole === 'admin';
-        const tenantId = req.tenantId || '550e8400-e29b-41d4-a716-446655440000'; // Default Tenant
+        const tenantId = (req.tenantId || (req.user && req.user.tenantId)) || '550e8400-e29b-41d4-a716-446655440000'; // Default Tenant
 
         await db.query(
             `INSERT INTO users (full_name, email, password, role, is_admin, tenant_id)

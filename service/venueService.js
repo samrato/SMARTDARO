@@ -1,9 +1,9 @@
 const db = require('../database/pgDb');
 
 // Get all venues
-const getAllVenues = async () => {
+const getAllVenues = async (tenantId) => {
     try {
-        const result = await db.query('SELECT id, name, capacity, location, is_available as "isAvailable" FROM rooms');
+        const result = await db.query('SELECT id, name, capacity, location, is_available as "isAvailable" FROM rooms WHERE tenant_id = $1', [tenantId]);
         return result.rows;
     } catch (error) {
         throw new Error('Failed to fetch venues');
@@ -11,9 +11,9 @@ const getAllVenues = async () => {
 };
 
 // Get venue by ID
-const getVenueById = async (venueId) => {
+const getVenueById = async (venueId, tenantId) => {
     try {
-        const result = await db.query('SELECT id, name, capacity, location, is_available as "isAvailable" FROM rooms WHERE id = $1', [venueId]);
+        const result = await db.query('SELECT id, name, capacity, location, is_available as "isAvailable" FROM rooms WHERE id = $1 AND tenant_id = $2', [venueId, tenantId]);
         if (result.rows.length === 0) throw new Error('Venue not found');
         return result.rows[0];
     } catch (error) {
@@ -22,14 +22,13 @@ const getVenueById = async (venueId) => {
 };
 
 // Create a new venue
-const addVenue = async (venueData) => {
+const addVenue = async ({ tenantId, name, capacity, location, isAvailable }) => {
     try {
-        const tenantId = '550e8400-e29b-41d4-a716-446655440000'; // Default Tenant
         const result = await db.query(
             `INSERT INTO rooms (tenant_id, name, capacity, location, is_available)
              VALUES ($1, $2, $3, $4, $5)
              RETURNING id, name, capacity, location, is_available as "isAvailable"`,
-            [tenantId, venueData.name, venueData.capacity, venueData.location || null, venueData.isAvailable !== false]
+            [tenantId, name, capacity, location || null, isAvailable !== false]
         );
         return result.rows[0];
     } catch (error) {
@@ -38,7 +37,7 @@ const addVenue = async (venueData) => {
 };
 
 // Update venue details
-const updateVenue = async (venueId, updates) => {
+const updateVenue = async (venueId, tenantId, updates) => {
     try {
         const fields = [];
         const values = [];
@@ -55,7 +54,8 @@ const updateVenue = async (venueId, updates) => {
         }
         if (fields.length === 0) throw new Error("No fields to update");
         values.push(venueId);
-        const query = `UPDATE rooms SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, name, capacity, location, is_available as "isAvailable"`;
+        values.push(tenantId);
+        const query = `UPDATE rooms SET ${fields.join(', ')} WHERE id = $${idx} AND tenant_id = $${idx + 1} RETURNING id, name, capacity, location, is_available as "isAvailable"`;
         const result = await db.query(query, values);
         if (result.rows.length === 0) throw new Error("Venue not found");
         return result.rows[0];
@@ -65,9 +65,9 @@ const updateVenue = async (venueId, updates) => {
 };
 
 // Delete a venue
-const deleteVenue = async (venueId) => {
+const deleteVenue = async (venueId, tenantId) => {
     try {
-        const result = await db.query('DELETE FROM rooms WHERE id = $1 RETURNING id', [venueId]);
+        const result = await db.query('DELETE FROM rooms WHERE id = $1 AND tenant_id = $2 RETURNING id', [venueId, tenantId]);
         if (result.rows.length === 0) return null;
         return result.rows[0];
     } catch (error) {

@@ -43,10 +43,15 @@ const deleteCache = async (key) => {
 
 const clearPattern = async (pattern) => {
     try {
-        const keys = await redisConnection.keys(pattern);
-        if (keys.length > 0) {
-            await redisConnection.del(...keys);
-        }
+        let cursor = '0';
+        do {
+            const reply = await redisConnection.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+            cursor = reply[0];
+            const keys = reply[1];
+            if (keys && keys.length > 0) {
+                await redisConnection.del(...keys);
+            }
+        } while (cursor !== '0');
     } catch (err) {
         console.error("Cache Clear Error:", err);
     }

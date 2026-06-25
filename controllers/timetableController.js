@@ -1,24 +1,34 @@
 const timetableService = require("../service/timetableService");
 const alertService = require('../service/alertService');
 const { timetableQueue } = require('../service/queueService');
-const User = require('../models/user');
 const db = require('../database/pgDb');
 const cache = require('../service/redisService');
 
 const allocateTimetableAIController = async (req, res, next) => {
     const { sessionId } = req.body;
+    const tenantId = req.tenantId;
     if (!sessionId) {
         return res.status(422).json({ message: "Academic session ID is required" });
     }
 
     try {
+        // Enforce that session belongs to admin's tenant
+        const sessionRes = await db.query('SELECT tenant_id FROM academic_sessions WHERE id = $1', [sessionId]);
+        if (sessionRes.rows.length === 0) {
+            return res.status(404).json({ message: "Academic session not found" });
+        }
+        if (sessionRes.rows[0].tenant_id !== tenantId) {
+            return res.status(403).json({ message: "Access denied: academic session belongs to a different tenant" });
+        }
+
         const job = await timetableQueue.add('generate-timetable', { 
             sessionId, 
-            userId: req.user ? req.user.id : "system" 
+            userId: req.user ? req.user.id : "system",
+            tenantId
         });
 
-        // Invalidate timetable caches
-        await cache.clearPattern("timetable:*");
+        // Invalidate timetable caches for this tenant
+        await cache.clearPattern(`timetable:${tenantId}:*`);
 
         res.status(202).json({ 
             status: 'queued', 
@@ -36,15 +46,19 @@ const publishTimetableController = async (req, res, next) => {
     const tenantId = req.tenantId;
 
     try {
-        await db.query(
+        const result = await db.query(
             `UPDATE timetable_versions 
              SET status = 'PUBLISHED' 
-             WHERE academic_session_id = $1 AND tenant_id = $2`,
+             WHERE academic_session_id = $1 AND tenant_id = $2 RETURNING *`,
             [sessionId, tenantId]
         );
 
-        // Invalidate timetable caches
-        await cache.clearPattern("timetable:*");
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "Timetable version not found or tenant mismatch" });
+        }
+
+        // Invalidate timetable caches for this tenant
+        await cache.clearPattern(`timetable:${tenantId}:*`);
 
         res.json({ 
             status: 'success', 
@@ -60,21 +74,27 @@ const lockTimetableController = async (req, res, next) => {
     const { allocationId } = req.params;
     const { lockReason } = req.body;
     const userId = req.user ? req.user.id : 'admin';
+    const tenantId = req.tenantId;
 
     try {
+        // Verify entry belongs to the tenant
+        const allocRes = await db.query('SELECT tenant_id FROM timetable_allocations WHERE id = $1', [allocationId]);
+        if (allocRes.rows.length === 0) {
+            return res.status(404).json({ message: "Timetable allocation not found" });
+        }
+        if (allocRes.rows[0].tenant_id !== tenantId) {
+            return res.status(403).json({ message: "Access denied: allocation belongs to a different tenant" });
+        }
+
         const result = await db.query(
             `UPDATE timetable_allocations 
              SET locked_by = $1, locked_at = NOW(), lock_reason = $2 
-             WHERE id = $3 RETURNING *`,
-            [userId, lockReason || "Manual lock override", allocationId]
+             WHERE id = $3 AND tenant_id = $4 RETURNING *`,
+            [userId, lockReason || "Manual lock override", allocationId, tenantId]
         );
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ message: "Timetable allocation not found" });
-        }
-
-        // Invalidate timetable caches
-        await cache.clearPattern("timetable:*");
+        // Invalidate timetable caches for this tenant
+        await cache.clearPattern(`timetable:${tenantId}:*`);
 
         res.json({ status: 'success', allocation: result.rows[0] });
     } catch (error) {
@@ -86,16 +106,17 @@ const lockTimetableController = async (req, res, next) => {
 const getTimetableByDayController = async (req, res, next) => {
     try {
         const { day } = req.params;
-        const cacheKey = `timetable:day:${day.toUpperCase()}`;
+        const tenantId = req.tenantId;
+        const cacheKey = `timetable:${tenantId}:day:${day.toUpperCase()}`;
         const cached = await cache.getCache(cacheKey);
         if (cached) {
             return res.json({ status: 'success', timetables: cached, source: "cache" });
         }
 
-        const timetables = await timetableService.getTimetableByDay(day);
+        const timetables = await timetableService.getTimetableByDay(day, tenantId);
 
         if (!timetables || timetables.length === 0) {
-            return res.status(404).json({ message: "No timetable found for this today" });
+            return res.status(404).json({ message: "No timetable found for today" });
         }
 
         await cache.setCache(cacheKey, timetables, 300);
@@ -109,13 +130,18 @@ const getTimetableByDayController = async (req, res, next) => {
 const getTimetableByIdController = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const cacheKey = `timetable:id:${id}`;
+        const tenantId = req.tenantId;
+        const cacheKey = `timetable:${tenantId}:id:${id}`;
         const cached = await cache.getCache(cacheKey);
         if (cached) {
             return res.json({ status: 'success', timetable: cached, source: "cache" });
         }
 
-        const timetable = await timetableService.getTimetableById(id);
+        const timetable = await timetableService.getTimetableById(id, tenantId);
+        if (!timetable) {
+            return res.status(404).json({ message: "Timetable not found" });
+        }
+
         await cache.setCache(cacheKey, timetable, 300);
         res.json({ status: 'success', timetable });
     } catch (error) {
@@ -127,8 +153,14 @@ const getTimetableByIdController = async (req, res, next) => {
 const deleteTimetableController = async (req, res, next) => {
     try {
         const { id } = req.params;
-        await timetableService.deleteTimetable(id);
-        await cache.clearPattern("timetable:*");
+        const tenantId = req.tenantId;
+        const result = await timetableService.deleteTimetable(id, tenantId);
+        
+        if (result.rowCount === 0) {
+            return res.status(404).json({ message: "Timetable entry not found or tenant mismatch" });
+        }
+
+        await cache.clearPattern(`timetable:${tenantId}:*`);
         res.json({ status: 'success', message: "Timetable entry deleted successfully" });
     } catch (error) {
         console.error("Error deleting timetable:", error);
@@ -140,18 +172,19 @@ const getUserTimetableController = async (req, res, next) => {
     try {
         const userId = req.user.id;
         const userRole = req.user.role;
+        const tenantId = req.user.tenantId;
 
-        if (!userId || !userRole) {
-            return res.status(401).json({ message: "Unauthorized: User ID or role not found." });
+        if (!userId || !userRole || !tenantId) {
+            return res.status(401).json({ message: "Unauthorized: Missing authentication context." });
         }
 
-        const cacheKey = `timetable:user:${userId}`;
+        const cacheKey = `timetable:${tenantId}:user:${userId}`;
         const cached = await cache.getCache(cacheKey);
         if (cached) {
             return res.json({ status: 'success', timetables: cached, source: "cache" });
         }
 
-        const timetables = await timetableService.getTimetableForUser(userId, userRole);
+        const timetables = await timetableService.getTimetableForUser(userId, userRole, tenantId);
 
         if (!timetables || timetables.length === 0) {
             return res.status(404).json({ message: "No timetable found for this user." });

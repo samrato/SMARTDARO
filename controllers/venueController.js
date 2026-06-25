@@ -5,13 +5,14 @@ const cache = require('../service/redisService');
 // Get all venues (Accessible to everyone)
 const getAllVenuesController = async (req, res, next) => {
     try {
-        const cacheKey = "venues:all";
+        const tenantId = req.tenantId;
+        const cacheKey = `venues:${tenantId}:all`;
         const cached = await cache.getCache(cacheKey);
         if (cached) {
             return res.json({ status: 'success', venues: cached, source: "cache" });
         }
 
-        const venues = await venueService.getAllVenues();
+        const venues = await venueService.getAllVenues(tenantId);
         await cache.setCache(cacheKey, venues, 300); // 5 min TTL
         res.json({ status: 'success', venues });
     } catch (error) {
@@ -24,13 +25,14 @@ const getAllVenuesController = async (req, res, next) => {
 const getVenueByIdController = async (req, res, next) => {
     try {
         const { venueId } = req.params;
-        const cacheKey = `venues:id:${venueId}`;
+        const tenantId = req.tenantId;
+        const cacheKey = `venues:${tenantId}:id:${venueId}`;
         const cached = await cache.getCache(cacheKey);
         if (cached) {
             return res.json({ status: 'success', venue: cached, source: "cache" });
         }
 
-        const venue = await venueService.getVenueById(venueId);
+        const venue = await venueService.getVenueById(venueId, tenantId);
         await cache.setCache(cacheKey, venue, 300);
         res.json({ status: 'success', venue });
     } catch (error) {
@@ -43,13 +45,14 @@ const getVenueByIdController = async (req, res, next) => {
 const addVenueController = async (req, res, next) => {
     try {
         const { name, capacity, location, isAvailable } = req.body;
+        const tenantId = req.tenantId;
 
         if (!name || !capacity) {
             return res.status(422).json({ message: "All fields are required" });
         }
 
-        const newVenue = await venueService.addVenue({ name, capacity, location, isAvailable });
-        await cache.clearPattern("venues:*");
+        const newVenue = await venueService.addVenue({ tenantId, name, capacity, location, isAvailable });
+        await cache.clearPattern(`venues:${tenantId}:*`);
         res.status(201).json({ status: 'success', venue: newVenue });
     } catch (error) {
         console.error("Error adding venue:", error);
@@ -62,14 +65,15 @@ const updateVenueController = async (req, res, next) => {
     try {
         const { venueId } = req.params;
         const { name, capacity, location, isAvailable } = req.body;
+        const tenantId = req.tenantId;
 
-        const updatedVenue = await venueService.updateVenue(venueId, { name, capacity, location, isAvailable });
+        const updatedVenue = await venueService.updateVenue(venueId, tenantId, { name, capacity, location, isAvailable });
 
         if (!updatedVenue) {
             return res.status(404).json({ message: "Venue not found" });
         }
 
-        await cache.clearPattern("venues:*");
+        await cache.clearPattern(`venues:${tenantId}:*`);
         res.json({ status: 'success', venue: updatedVenue });
     } catch (error) {
         console.error("Error updating venue:", error);
@@ -81,13 +85,14 @@ const updateVenueController = async (req, res, next) => {
 const deleteVenueController = async (req, res, next) => {
     try {
         const { venueId } = req.params;
-        const deletedVenue = await venueService.deleteVenue(venueId);
+        const tenantId = req.tenantId;
+        const deletedVenue = await venueService.deleteVenue(venueId, tenantId);
 
         if (!deletedVenue) {
             return res.status(404).json({ message: "Venue not found" });
         }
 
-        await cache.clearPattern("venues:*");
+        await cache.clearPattern(`venues:${tenantId}:*`);
         res.json({ status: 'success', message: 'Venue deleted successfully' });
     } catch (error) {
         console.error("Error deleting venue:", error);
