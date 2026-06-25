@@ -7,22 +7,12 @@ services:
       - "3001:3001"
     environment:
       - PORT=3001
-      - MONGO_URL=mongodb://db:27017/smartdaro
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/smartdaro
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET=supersecretjwtkeyforproduction_change_me
     depends_on:
-      - db
       - postgres
       - redis
-    restart: always
-
-  db:
-    image: mongo:6.0
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo-data:/data/db
     restart: always
 
   postgres:
@@ -44,6 +34,5 @@ services:
     restart: always
 
 volumes:
-  mongo-data:
   postgres-data:
 

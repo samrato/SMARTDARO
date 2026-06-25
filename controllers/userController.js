@@ -1,10 +1,6 @@
-const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const User = require("../models/user");
-const HttpError = require("../models/errorModel");
-
-
+const db = require("../database/pgDb");
 
 // ================== GENERATE TOKEN ==================
 const generateToken = (payload) => {
@@ -12,137 +8,139 @@ const generateToken = (payload) => {
 };
 
 // ================== REGISTER USER ==================
-//========== POST : api/users/register (Unprotected)
 const registerUser = async (req, res, next) => {
     try {
-        const { fullName, email, password, password2, role } = req.body; // Added role to destructuring
+        const { fullName, email, password, password2, role } = req.body;
 
         if (!fullName || !email || !password || !password2) {
-            return res.status(422).json({message:"Fill in all fields"})
+            return res.status(422).json({ message: "Fill in all fields" });
         }
 
         const newEmail = email.toLowerCase();
-        const existingUser = await User.findOne({ email: newEmail });
-
-        if (existingUser) {
-            return res.status(422).json({message:"Email already exits "})
-
+        
+        // Check existing user
+        const existingRes = await db.query("SELECT id FROM users WHERE email = $1", [newEmail]);
+        if (existingRes.rows.length > 0) {
+            return res.status(422).json({ message: "Email already exists" });
         }
 
         if (password.trim().length < 6) {
-            return res.status(422).json({message:"Password must be at least 6 characters"})
-
+            return res.status(422).json({ message: "Password must be at least 6 characters" });
         }
 
         if (password !== password2) {
-            return res.status(422).json({message:"password do not match"})
+            return res.status(422).json({ message: "passwords do not match" });
         }
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Determine the role for the new user. Default to 'student' if not provided or invalid.
         const userRole = ['admin', 'instructor', 'student'].includes(role) ? role : 'student';
+        const isAdmin = userRole === 'admin';
+        const tenantId = req.tenantId || '550e8400-e29b-41d4-a716-446655440000'; // Default Tenant
 
-        let isAdmin = userRole === 'admin';
-
-        const newUser = await User.create({ fullName, email: newEmail, password: hashedPassword, role: userRole, isAdmin }); // Assign the determined role
+        await db.query(
+            `INSERT INTO users (full_name, email, password, role, is_admin, tenant_id)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [fullName, newEmail, hashedPassword, userRole, isAdmin, tenantId]
+        );
 
         res.status(201).json({ message: `User ${fullName} registered successfully` });
-
     } catch (error) {
         console.error("Registration Error:", error);
-        return res.status(500).json({message:"User registration Failed"})
-
+        return res.status(500).json({ message: "User registration Failed" });
     }
 };
 
 // ================== LOGIN USER ==================
-//========== POST : api/users/login (Unprotected)
 const loginUser = async (req, res, next) => {
     try {
         const { email, password } = req.body;
 
         if (!email || !password) {
-            return res.status(422).json({message:"Fill in all fields"})
-
+            return res.status(422).json({ message: "Fill in all fields" });
         }
 
         const newEmail = email.toLowerCase();
-        const user = await User.findOne({ email: newEmail }).select("+password");
+        const userRes = await db.query("SELECT * FROM users WHERE email = $1", [newEmail]);
 
-        if (!user) {
-            return res.status(422).json({message:"Invalid Credentials "})
-
+        if (userRes.rows.length === 0) {
+            return res.status(422).json({ message: "Invalid Credentials" });
         }
+
+        const user = userRes.rows[0];
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            return res.status(422).json({message:"Invalid credentials"})
+            return res.status(422).json({ message: "Invalid credentials" });
         }
 
-        // Include user's role, isAdmin, and tenantId flag in the token payload and response
-        const token = generateToken({ id: user._id, role: user.role, isAdmin: user.isAdmin, tenantId: user.tenantId });
+        const token = generateToken({ 
+            id: user.id, 
+            role: user.role, 
+            isAdmin: user.is_admin, 
+            tenantId: user.tenant_id 
+        });
 
-        res.json({ token, userId: user._id, role: user.role, isAdmin: user.isAdmin, tenantId: user.tenantId }); // Return role in response too
-
+        res.json({ 
+            token, 
+            userId: user.id, 
+            role: user.role, 
+            isAdmin: user.is_admin, 
+            tenantId: user.tenant_id 
+        });
     } catch (error) {
         console.error("Login Error:", error);
-        return res.status(500).json({message:"Login failed ,try again later"})
-
+        return res.status(500).json({ message: "Login failed, try again later" });
     }
 };
 
-
 // ================== GET USER BY ID ==================
-//========== GET : api/users/:userId (Protected)
 const getUser = async (req, res, next) => {
     try {
         const { userId } = req.params;
-        const user = await User.findById(userId).select("-password");
+        const userRes = await db.query(
+            `SELECT id, full_name as "fullName", email, is_admin as "isAdmin", 
+                    role, tenant_id as "tenantId", preferences 
+             FROM users WHERE id = $1`,
+            [userId]
+        );
 
-        if (!user) {
-            return res.status(404).json({message:"User not found"})
-            
+        if (userRes.rows.length === 0) {
+            return res.status(404).json({ message: "User not found" });
         }
 
-        res.json({ status: "success", user });
-
+        res.json({ status: "success", user: userRes.rows[0] });
     } catch (error) {
         console.error("Get User Error:", error);
-        return res.status(500).json({message:"Could not retrive user"})
-       
+        return res.status(500).json({ message: "Could not retrieve user" });
     }
 };
 
 // ================== UPDATE USER PREFERENCES ==================
-//========== PUT : api/users/:userId (Protected)
 const updateUser = async (req, res, next) => {
     try {
         const { userId } = req.params;
         const { preferences } = req.body;
 
-        const updatedUser = await User.findByIdAndUpdate(userId, { preferences }, { new: true });
+        const updatedRes = await db.query(
+            `UPDATE users 
+             SET preferences = $1 
+             WHERE id = $2 
+             RETURNING id, full_name as "fullName", email, is_admin as "isAdmin", 
+                       role, tenant_id as "tenantId", preferences`,
+            [JSON.stringify(preferences || {}), userId]
+        );
 
-        if (!updatedUser) {
-            return res.status(404).json({message:"User not found"})
-           
+        if (updatedRes.rows.length === 0) {
+            return res.status(404).json({ message: "User not found" });
         }
 
-        res.json({ status: "success", user: updatedUser });
-
+        res.json({ status: "success", user: updatedRes.rows[0] });
     } catch (error) {
         console.error("Update User Preferences Error:", error);
-        return next(new HttpError("Failed to update user preferences", 500));
+        return res.status(500).json({ message: "Failed to update user preferences" });
     }
 };
 
 module.exports = { registerUser, loginUser, getUser, updateUser };
-
-
-
-
-
-
-
-

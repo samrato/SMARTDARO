@@ -1,6 +1,4 @@
 const db = require('../database/pgDb');
-const Course = require('../models/course');
-const Venue = require('../models/venue');
 
 class TimetableService {
     async generateTimetable(sessionId, userId) {
@@ -34,30 +32,34 @@ class TimetableService {
             [versionId]
         );
 
-        // Step 2: Fetch courses and venues from MongoDB
-        const rawCourses = await Course.find().lean();
-        const rawRooms = await Venue.find().lean();
+        // Step 2: Fetch courses and rooms from PostgreSQL
+        const coursesRes = await db.query(
+            'SELECT id, code, capacity, instructor_id as "lecturer_id" FROM courses WHERE tenant_id = $1',
+            [tenantId]
+        );
+        const roomsRes = await db.query(
+            'SELECT id, name, capacity FROM rooms WHERE tenant_id = $1 AND is_available = TRUE',
+            [tenantId]
+        );
 
-        if (!rawCourses || rawCourses.length === 0) {
+        const courses = coursesRes.rows.map(c => ({
+            id: c.id,
+            code: c.code,
+            capacity: c.capacity,
+            lecturer_id: c.lecturer_id
+        }));
+        const rooms = roomsRes.rows.map(r => ({
+            id: r.id,
+            name: r.name,
+            capacity: r.capacity
+        }));
+
+        if (!courses || courses.length === 0) {
             throw new Error("No courses found to schedule");
         }
-        if (!rawRooms || rawRooms.length === 0) {
+        if (!rooms || rooms.length === 0) {
             throw new Error("No rooms found to schedule");
         }
-
-        // Map MongoDB fields to the solver properties
-        const courses = rawCourses.map(c => ({
-            id: c._id.toString(),
-            code: c.code,
-            capacity: c.capacity || 40,
-            lecturer_id: c.instructor ? c.instructor.toString() : null
-        }));
-
-        const rooms = rawRooms.map(r => ({
-            id: r._id.toString(),
-            name: r.name,
-            capacity: r.capacity || 40
-        }));
 
         // Define standard timeslots & days
         const days = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"];

@@ -5,8 +5,6 @@ const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 
-const connectDb = require("./database/Db"); 
-const User = require("./models/user");
 const userRoutes = require("./Routes/userRoutes");
 const venueRoutes = require("./Routes/venueRoutes");
 const courseRoutes = require("./Routes/courseRoutes");
@@ -65,8 +63,6 @@ const PORT = process.env.PORT || 3001;
 // Connect to the database and start the server
 const startServer = async () => {
   try {
-    await connectDb();
-
     // Verify PostgreSQL connection
     const pgDb = require("./database/pgDb");
     await pgDb.query("SELECT 1");
@@ -76,8 +72,8 @@ const startServer = async () => {
     cron.schedule('*/15 * * * *', async () => {
       console.log('⏰ Running cron job every 15 minutes');
       try {
-        const userCount = await User.countDocuments();
-        console.log(`📊 Total users in the database: ${userCount}`);
+        const userCountRes = await pgDb.query("SELECT COUNT(*) FROM users");
+        console.log(`📊 Total users in the database: ${userCountRes.rows[0].count}`);
       } catch (err) {
         console.error("❌ Cron job error:", err);
       }

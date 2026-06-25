@@ -1,4 +1,30 @@
+# Dependency directories
+node_modules/
+jspm_packages/
 
-node_modules
-
+# Environment files
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# Debug and system logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# OS metadata files
+.DS_Store
+Thumbs.db
+
+# IDEs and editors
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

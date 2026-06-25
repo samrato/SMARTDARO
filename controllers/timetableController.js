@@ -3,6 +3,7 @@ const alertService = require('../service/alertService');
 const { timetableQueue } = require('../service/queueService');
 const User = require('../models/user');
 const db = require('../database/pgDb');
+const cache = require('../service/redisService');
 
 const allocateTimetableAIController = async (req, res, next) => {
     const { sessionId } = req.body;
@@ -15,6 +16,9 @@ const allocateTimetableAIController = async (req, res, next) => {
             sessionId, 
             userId: req.user ? req.user.id : "system" 
         });
+
+        // Invalidate timetable caches
+        await cache.clearPattern("timetable:*");
 
         res.status(202).json({ 
             status: 'queued', 
@@ -32,12 +36,15 @@ const publishTimetableController = async (req, res, next) => {
     const tenantId = req.tenantId;
 
     try {
-        const result = await db.query(
+        await db.query(
             `UPDATE timetable_versions 
              SET status = 'PUBLISHED' 
              WHERE academic_session_id = $1 AND tenant_id = $2`,
             [sessionId, tenantId]
         );
+
+        // Invalidate timetable caches
+        await cache.clearPattern("timetable:*");
 
         res.json({ 
             status: 'success', 
@@ -66,6 +73,9 @@ const lockTimetableController = async (req, res, next) => {
             return res.status(404).json({ message: "Timetable allocation not found" });
         }
 
+        // Invalidate timetable caches
+        await cache.clearPattern("timetable:*");
+
         res.json({ status: 'success', allocation: result.rows[0] });
     } catch (error) {
         console.error("Error locking allocation:", error);
@@ -76,12 +86,19 @@ const lockTimetableController = async (req, res, next) => {
 const getTimetableByDayController = async (req, res, next) => {
     try {
         const { day } = req.params;
+        const cacheKey = `timetable:day:${day.toUpperCase()}`;
+        const cached = await cache.getCache(cacheKey);
+        if (cached) {
+            return res.json({ status: 'success', timetables: cached, source: "cache" });
+        }
+
         const timetables = await timetableService.getTimetableByDay(day);
 
         if (!timetables || timetables.length === 0) {
             return res.status(404).json({ message: "No timetable found for this today" });
         }
 
+        await cache.setCache(cacheKey, timetables, 300);
         res.json({ status: 'success', timetables });
     } catch (error) {
         console.error("Error retrieving timetables:", error);
@@ -91,7 +108,15 @@ const getTimetableByDayController = async (req, res, next) => {
 
 const getTimetableByIdController = async (req, res, next) => {
     try {
-        const timetable = await timetableService.getTimetableById(req.params.id);
+        const { id } = req.params;
+        const cacheKey = `timetable:id:${id}`;
+        const cached = await cache.getCache(cacheKey);
+        if (cached) {
+            return res.json({ status: 'success', timetable: cached, source: "cache" });
+        }
+
+        const timetable = await timetableService.getTimetableById(id);
+        await cache.setCache(cacheKey, timetable, 300);
         res.json({ status: 'success', timetable });
     } catch (error) {
         console.error("Error retrieving timetable by ID:", error);
@@ -101,7 +126,9 @@ const getTimetableByIdController = async (req, res, next) => {
 
 const deleteTimetableController = async (req, res, next) => {
     try {
-        await timetableService.deleteTimetable(req.params.id);
+        const { id } = req.params;
+        await timetableService.deleteTimetable(id);
+        await cache.clearPattern("timetable:*");
         res.json({ status: 'success', message: "Timetable entry deleted successfully" });
     } catch (error) {
         console.error("Error deleting timetable:", error);
@@ -118,12 +145,19 @@ const getUserTimetableController = async (req, res, next) => {
             return res.status(401).json({ message: "Unauthorized: User ID or role not found." });
         }
 
+        const cacheKey = `timetable:user:${userId}`;
+        const cached = await cache.getCache(cacheKey);
+        if (cached) {
+            return res.json({ status: 'success', timetables: cached, source: "cache" });
+        }
+
         const timetables = await timetableService.getTimetableForUser(userId, userRole);
 
         if (!timetables || timetables.length === 0) {
             return res.status(404).json({ message: "No timetable found for this user." });
         }
 
+        await cache.setCache(cacheKey, timetables, 300);
         res.json({ status: 'success', timetables });
     } catch (error) {
         console.error("Error retrieving user timetable:", error);
