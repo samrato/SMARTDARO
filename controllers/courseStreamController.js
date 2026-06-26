@@ -44,7 +44,87 @@ const getCourseStreams = async (req, res, next) => {
     }
 };
 
+const getAllCourseStreams = async (req, res, next) => {
+    const tenantId = req.tenantId;
+
+    try {
+        const result = await db.query(
+            'SELECT * FROM course_streams WHERE tenant_id = $1 ORDER BY stream_name ASC',
+            [tenantId]
+        );
+        res.json({ status: "success", streams: result.rows });
+    } catch (error) {
+        console.error("Error fetching course streams:", error);
+        res.status(500).json({ message: "Failed to fetch course streams" });
+    }
+};
+
+const getCourseStreamById = async (req, res, next) => {
+    const { id } = req.params;
+    const tenantId = req.tenantId;
+
+    try {
+        const result = await db.query(
+            'SELECT * FROM course_streams WHERE id = $1 AND tenant_id = $2',
+            [id, tenantId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "Course stream not found" });
+        }
+        res.json({ status: "success", stream: result.rows[0] });
+    } catch (error) {
+        console.error("Error fetching course stream by ID:", error);
+        res.status(500).json({ message: "Failed to fetch course stream" });
+    }
+};
+
+const updateCourseStream = async (req, res, next) => {
+    const { id } = req.params;
+    const { streamName, capacity } = req.body;
+    const tenantId = req.tenantId;
+
+    try {
+        const result = await db.query(
+            `UPDATE course_streams 
+             SET stream_name = COALESCE($1, stream_name),
+                 capacity = COALESCE($2, capacity)
+             WHERE id = $3 AND tenant_id = $4 RETURNING *`,
+            [streamName, capacity, id, tenantId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "Course stream not found" });
+        }
+        res.json({ status: "success", stream: result.rows[0] });
+    } catch (error) {
+        console.error("Error updating course stream:", error);
+        res.status(500).json({ message: "Failed to update course stream" });
+    }
+};
+
+const deleteCourseStream = async (req, res, next) => {
+    const { id } = req.params;
+    const tenantId = req.tenantId;
+
+    try {
+        const result = await db.query(
+            'DELETE FROM course_streams WHERE id = $1 AND tenant_id = $2 RETURNING id',
+            [id, tenantId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "Course stream not found" });
+        }
+        res.json({ status: "success", message: "Course stream deleted successfully" });
+    } catch (error) {
+        console.error("Error deleting course stream:", error);
+        res.status(500).json({ message: "Failed to delete course stream" });
+    }
+};
+
 module.exports = {
     createCourseStream,
-    getCourseStreams
+    getCourseStreams,
+    getAllCourseStreams,
+    getCourseStreamById,
+    updateCourseStream,
+    deleteCourseStream
 };

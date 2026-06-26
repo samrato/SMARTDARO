@@ -100,10 +100,90 @@ const deleteVenueController = async (req, res, next) => {
     }
 };
 
+const createRoomTagController = async (req, res, next) => {
+    try {
+        const { tagName } = req.body;
+        const tenantId = req.tenantId;
+
+        if (!tagName) {
+            return res.status(422).json({ message: "tagName is required" });
+        }
+
+        const tag = await venueService.createRoomTag({ tenantId, tagName });
+        res.status(201).json({ status: 'success', tag });
+    } catch (error) {
+        console.error("Error creating room tag:", error);
+        return res.status(500).json({ message: "Failed to create room tag" });
+    }
+};
+
+const getRoomTagsController = async (req, res, next) => {
+    try {
+        const tenantId = req.tenantId;
+        const tags = await venueService.getRoomTags(tenantId);
+        res.json({ status: 'success', tags });
+    } catch (error) {
+        console.error("Error fetching room tags:", error);
+        return res.status(500).json({ message: "Failed to fetch room tags" });
+    }
+};
+
+const addVenueTagController = async (req, res, next) => {
+    try {
+        const { id } = req.params; // venue id
+        const { tagId } = req.body;
+        const tenantId = req.tenantId;
+
+        if (!tagId) {
+            return res.status(422).json({ message: "tagId is required" });
+        }
+
+        const relation = await venueService.addVenueTag({ tenantId, venueId: id, tagId });
+        res.status(201).json({ status: 'success', relation });
+    } catch (error) {
+        console.error("Error adding venue tag:", error);
+        return res.status(500).json({ message: "Failed to add venue tag" });
+    }
+};
+
+const getVenueTagsController = async (req, res, next) => {
+    try {
+        const { id } = req.params; // venue id
+        const tenantId = req.tenantId;
+        const tags = await venueService.getVenueTags(id, tenantId);
+        res.json({ status: 'success', tags });
+    } catch (error) {
+        console.error("Error fetching venue tags:", error);
+        return res.status(500).json({ message: "Failed to fetch venue tags" });
+    }
+};
+
+const deleteVenueTagController = async (req, res, next) => {
+    try {
+        const { id, tagId } = req.params;
+        const tenantId = req.tenantId;
+        const deleted = await venueService.deleteVenueTag({ tenantId, venueId: id, tagId });
+
+        if (!deleted) {
+            return res.status(404).json({ message: "Venue tag relation not found" });
+        }
+
+        res.json({ status: 'success', message: 'Venue tag removed successfully' });
+    } catch (error) {
+        console.error("Error deleting venue tag:", error);
+        return res.status(500).json({ message: "Failed to delete venue tag" });
+    }
+};
+
 module.exports = {
     getAllVenuesController,
     getVenueByIdController,
     addVenueController,
     updateVenueController,
-    deleteVenueController
+    deleteVenueController,
+    createRoomTagController,
+    getRoomTagsController,
+    addVenueTagController,
+    getVenueTagsController,
+    deleteVenueTagController
 };

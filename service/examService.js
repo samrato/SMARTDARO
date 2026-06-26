@@ -16,6 +16,31 @@ class ExamService {
         return result.rows[0];
     }
 
+    async getExamById(id, tenantId) {
+        const result = await db.query(
+            'SELECT e.*, c.name as "courseName", c.code as "courseCode" FROM exams e JOIN courses c ON e.course_id = c.id WHERE e.id = $1 AND e.tenant_id = $2',
+            [id, tenantId]
+        );
+        return result.rows[0];
+    }
+
+    async updateExam(id, tenantId, { examDate, startTime, endTime, type }) {
+        const result = await db.query(
+            `UPDATE exams 
+             SET exam_date = COALESCE($1, exam_date),
+                 start_time = COALESCE($2, start_time),
+                 end_time = COALESCE($3, end_time),
+                 type = COALESCE($4, type)
+             WHERE id = $5 AND tenant_id = $6 RETURNING *`,
+            [examDate, startTime, endTime, type, id, tenantId]
+        );
+        return result.rows[0];
+    }
+
+    async deleteExam(id, tenantId) {
+        return await db.query('DELETE FROM exams WHERE id = $1 AND tenant_id = $2', [id, tenantId]);
+    }
+
     async getExams(tenantId, academicSessionId) {
         let query = 'SELECT e.*, c.name as "courseName", c.code as "courseCode" FROM exams e JOIN courses c ON e.course_id = c.id WHERE e.tenant_id = $1';
         const params = [tenantId];
@@ -134,6 +159,155 @@ class ExamService {
             [tenantId, examAllocationId]
         );
         return result.rows;
+    }
+
+    // AI Exam Scheduling Solver
+    async scheduleExamsAI({ tenantId, academicSessionId }) {
+        const examsRes = await db.query('SELECT * FROM exams WHERE tenant_id = $1 AND academic_session_id = $2', [tenantId, academicSessionId]);
+        const exams = examsRes.rows;
+
+        const roomsRes = await db.query('SELECT * FROM rooms WHERE tenant_id = $1 AND is_available = TRUE', [tenantId]);
+        const rooms = roomsRes.rows;
+
+        const instructorsRes = await db.query("SELECT id FROM users WHERE tenant_id = $1 AND role = 'instructor'", [tenantId]);
+        const instructors = instructorsRes.rows;
+
+        if (exams.length === 0) throw new Error("No exams found to schedule");
+        if (rooms.length === 0) throw new Error("No available rooms found");
+        if (instructors.length === 0) throw new Error("No available invigilators found");
+
+        const allocations = [];
+
+        // Clear existing allocations
+        for (const exam of exams) {
+            await db.query('DELETE FROM exam_allocations WHERE exam_id = $1 AND tenant_id = $2', [exam.id, tenantId]);
+        }
+
+        for (const exam of exams) {
+            let allocated = false;
+            for (const room of rooms) {
+                if (allocated) break;
+
+                const roomClash = allocations.some(a => 
+                    a.roomId === room.id &&
+                    a.examDate === exam.exam_date &&
+                    !(a.endTime <= exam.start_time || a.startTime >= exam.end_time)
+                );
+                if (roomClash) continue;
+
+                let selectedInvigilator = null;
+                for (const inst of instructors) {
+                    const invClash = allocations.some(a => 
+                        a.invigilatorId === inst.id &&
+                        a.examDate === exam.exam_date &&
+                        !(a.endTime <= exam.start_time || a.startTime >= exam.end_time)
+                    );
+                    if (!invClash) {
+                        selectedInvigilator = inst.id;
+                        break;
+                    }
+                }
+                if (!selectedInvigilator) continue;
+
+                const allocRes = await db.query(
+                    `INSERT INTO exam_allocations (tenant_id, exam_id, room_id, seating_capacity)
+                     VALUES ($1, $2, $3, $4) RETURNING *`,
+                    [tenantId, exam.id, room.id, room.capacity]
+                );
+                const allocation = allocRes.rows[0];
+
+                await db.query(
+                    `INSERT INTO invigilator_allocations (tenant_id, exam_allocation_id, invigilator_id)
+                     VALUES ($1, $2, $3)`,
+                    [tenantId, allocation.id, selectedInvigilator]
+                );
+
+                allocations.push({
+                    examId: exam.id,
+                    roomId: room.id,
+                    invigilatorId: selectedInvigilator,
+                    examDate: exam.exam_date,
+                    startTime: exam.start_time,
+                    endTime: exam.end_time
+                });
+                allocated = true;
+                break;
+            }
+            if (!allocated) {
+                throw new Error(`Failed to allocate resources for exam ${exam.id} due to conflicts.`);
+            }
+        }
+        return allocations;
+    }
+
+    // Seating Plans
+    async generateSeatingPlan({ tenantId, examId }) {
+        const examRes = await db.query('SELECT course_id FROM exams WHERE id = $1 AND tenant_id = $2', [examId, tenantId]);
+        if (examRes.rows.length === 0) throw new Error("Exam not found");
+        const courseId = examRes.rows[0].course_id;
+
+        const studentsRes = await db.query(
+            "SELECT student_id FROM student_registrations WHERE unit_id = $1 AND tenant_id = $2 AND registration_status = 'REGISTERED'",
+            [courseId, tenantId]
+        );
+        const students = studentsRes.rows.map(r => r.student_id);
+        if (students.length === 0) throw new Error("No students registered for this exam's course");
+
+        const allocsRes = await db.query('SELECT * FROM exam_allocations WHERE exam_id = $1 AND tenant_id = $2', [examId, tenantId]);
+        const allocations = allocsRes.rows;
+        if (allocations.length === 0) throw new Error("No rooms allocated for this exam");
+
+        for (const alloc of allocations) {
+            await db.query('DELETE FROM seating_plans WHERE exam_allocation_id = $1 AND tenant_id = $2', [alloc.id, tenantId]);
+        }
+
+        const seatingPlan = [];
+        let studentIndex = 0;
+
+        for (const alloc of allocations) {
+            const seats = alloc.seating_capacity;
+            for (let seatNum = 1; seatNum <= seats; seatNum++) {
+                if (studentIndex >= students.length) break;
+
+                const studentId = students[studentIndex];
+                const seatLabel = `SEAT-${seatNum}`;
+
+                const result = await db.query(
+                    `INSERT INTO seating_plans (tenant_id, exam_allocation_id, student_id, seat_number)
+                     VALUES ($1, $2, $3, $4) RETURNING *`,
+                    [tenantId, alloc.id, studentId, seatLabel]
+                );
+                seatingPlan.push(result.rows[0]);
+                studentIndex++;
+            }
+            if (studentIndex >= students.length) break;
+        }
+
+        if (studentIndex < students.length) {
+            throw new Error(`Insufficient seating capacity! Allocated: ${studentIndex}, Required: ${students.length}`);
+        }
+        return seatingPlan;
+    }
+
+    async getSeatingPlan(tenantId, examId) {
+        const result = await db.query(
+            `SELECT sp.*, u.full_name as "studentName", u.email as "studentEmail", r.name as "roomName"
+             FROM seating_plans sp
+             JOIN exam_allocations ea ON sp.exam_allocation_id = ea.id
+             JOIN rooms r ON ea.room_id = r.id
+             JOIN users u ON sp.student_id = u.id
+             WHERE sp.tenant_id = $1 AND ea.exam_id = $2`,
+            [tenantId, examId]
+        );
+        return result.rows;
+    }
+
+    async updateSeatAssignment(seatId, tenantId, seatNumber) {
+        const result = await db.query(
+            'UPDATE seating_plans SET seat_number = $1 WHERE id = $2 AND tenant_id = $3 RETURNING *',
+            [seatNumber, seatId, tenantId]
+        );
+        return result.rows[0];
     }
 }
 

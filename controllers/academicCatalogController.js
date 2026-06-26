@@ -100,6 +100,52 @@ const getCampuses = async (req, res) => {
     }
 };
 
+const getCampusById = async (req, res) => {
+    const { id } = req.params;
+    const tenantId = req.tenantId;
+    try {
+        const campus = await service.getCampusById(id, tenantId);
+        if (!campus) {
+            return res.status(404).json({ message: "Campus not found" });
+        }
+        res.json({ status: "success", campus });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Failed to fetch campus" });
+    }
+};
+
+const updateCampus = async (req, res) => {
+    const { id } = req.params;
+    const tenantId = req.tenantId;
+    const { name, location } = req.body;
+    try {
+        const campus = await service.updateCampus(id, tenantId, { name, location });
+        if (!campus) {
+            return res.status(404).json({ message: "Campus not found" });
+        }
+        res.json({ status: "success", campus });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Failed to update campus" });
+    }
+};
+
+const deleteCampus = async (req, res) => {
+    const { id } = req.params;
+    const tenantId = req.tenantId;
+    try {
+        const campus = await service.deleteCampus(id, tenantId);
+        if (!campus) {
+            return res.status(404).json({ message: "Campus not found" });
+        }
+        res.json({ status: "success", message: "Campus deleted successfully" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Failed to delete campus" });
+    }
+};
+
 module.exports = {
     createFaculty,
     getFaculties,
@@ -108,5 +154,8 @@ module.exports = {
     createUnit,
     getUnits,
     createCampus,
-    getCampuses
+    getCampuses,
+    getCampusById,
+    updateCampus,
+    deleteCampus
 };

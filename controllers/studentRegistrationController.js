@@ -72,8 +72,61 @@ const getStudentRegistrations = async (req, res, next) => {
     }
 };
 
+const getAllRegistrations = async (req, res, next) => {
+    const tenantId = req.tenantId;
+
+    try {
+        const result = await db.query(
+            'SELECT * FROM student_registrations WHERE tenant_id = $1 ORDER BY created_at DESC',
+            [tenantId]
+        );
+        res.json({ status: "success", registrations: result.rows });
+    } catch (error) {
+        console.error("Error fetching registrations:", error);
+        res.status(500).json({ message: "Failed to fetch registrations" });
+    }
+};
+
+const getRegistrationsByStudent = async (req, res, next) => {
+    const { studentId } = req.params;
+    const tenantId = req.tenantId;
+
+    try {
+        const result = await db.query(
+            'SELECT * FROM student_registrations WHERE tenant_id = $1 AND student_id = $2 ORDER BY created_at DESC',
+            [tenantId, studentId]
+        );
+        res.json({ status: "success", registrations: result.rows });
+    } catch (error) {
+        console.error("Error fetching registrations for student:", error);
+        res.status(500).json({ message: "Failed to fetch registrations" });
+    }
+};
+
+const deleteRegistration = async (req, res, next) => {
+    const { id } = req.params;
+    const tenantId = req.tenantId;
+
+    try {
+        const result = await db.query(
+            'DELETE FROM student_registrations WHERE id = $1 AND tenant_id = $2 RETURNING id',
+            [id, tenantId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "Registration not found" });
+        }
+        res.json({ status: "success", message: "Registration deleted successfully" });
+    } catch (error) {
+        console.error("Error deleting registration:", error);
+        res.status(500).json({ message: "Failed to delete registration" });
+    }
+};
+
 module.exports = {
     registerStudent,
     dropRegistration,
-    getStudentRegistrations
+    getStudentRegistrations,
+    getAllRegistrations,
+    getRegistrationsByStudent,
+    deleteRegistration
 };

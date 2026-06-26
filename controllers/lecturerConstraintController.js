@@ -4,7 +4,9 @@ const upsertLecturerConstraints = async (req, res, next) => {
     const { lecturerId, preferredDays, preferredTimeSlots, unavailableDays, maxHoursPerWeek, maxClassesPerDay, homeCampus, travelBufferMinutes } = req.body;
     const tenantId = req.tenantId;
 
-    if (!lecturerId) {
+    const actualLecturerId = lecturerId || req.params.lecturerId;
+
+    if (!actualLecturerId) {
         return res.status(422).json({ message: "Lecturer ID is required" });
     }
 
@@ -28,7 +30,7 @@ const upsertLecturerConstraints = async (req, res, next) => {
         `;
         const values = [
             tenantId, 
-            lecturerId, 
+            actualLecturerId, 
             JSON.stringify(preferredDays || []), 
             JSON.stringify(preferredTimeSlots || []), 
             JSON.stringify(unavailableDays || []), 
@@ -67,7 +69,27 @@ const getLecturerConstraints = async (req, res, next) => {
     }
 };
 
+const deleteLecturerConstraints = async (req, res, next) => {
+    const { lecturerId } = req.params;
+    const tenantId = req.tenantId;
+
+    try {
+        const result = await db.query(
+            'DELETE FROM lecturer_constraints WHERE tenant_id = $1 AND lecturer_id = $2 RETURNING id',
+            [tenantId, lecturerId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "No constraints found for this lecturer" });
+        }
+        res.json({ status: "success", message: "Lecturer constraints deleted successfully" });
+    } catch (error) {
+        console.error("Error deleting lecturer constraints:", error);
+        res.status(500).json({ message: "Failed to delete lecturer constraints" });
+    }
+};
+
 module.exports = {
     upsertLecturerConstraints,
-    getLecturerConstraints
+    getLecturerConstraints,
+    deleteLecturerConstraints
 };

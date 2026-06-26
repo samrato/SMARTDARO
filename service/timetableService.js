@@ -240,6 +240,144 @@ class TimetableService {
         const result = await db.query(queryText, params);
         return result.rows;
     }
+
+    async getDraftTimetables(tenantId) {
+        const result = await db.query(
+            `SELECT ta.* FROM timetable_allocations ta
+             JOIN timetable_versions tv ON ta.timetable_version_id = tv.id
+             WHERE tv.status = 'DRAFT' AND ta.tenant_id = $1`,
+            [tenantId]
+        );
+        return result.rows;
+    }
+
+    async getPublishedTimetables(tenantId) {
+        const result = await db.query(
+            `SELECT ta.* FROM timetable_allocations ta
+             JOIN timetable_versions tv ON ta.timetable_version_id = tv.id
+             WHERE tv.status = 'PUBLISHED' AND ta.tenant_id = $1`,
+            [tenantId]
+        );
+        return result.rows;
+    }
+
+    async getLockedTimetables(tenantId) {
+        const result = await db.query(
+            `SELECT * FROM timetable_allocations WHERE locked_by IS NOT NULL AND tenant_id = $1`,
+            [tenantId]
+        );
+        return result.rows;
+    }
+
+    async getTimetableVersions(tenantId) {
+        const result = await db.query(
+            'SELECT * FROM timetable_versions WHERE tenant_id = $1 ORDER BY version_number DESC',
+            [tenantId]
+        );
+        return result.rows;
+    }
+
+    async getTimetableVersionById(id, tenantId) {
+        const result = await db.query(
+            'SELECT * FROM timetable_versions WHERE id = $1 AND tenant_id = $2',
+            [id, tenantId]
+        );
+        return result.rows[0];
+    }
+
+    async restoreTimetableVersion(id, tenantId) {
+        const versionRes = await db.query(
+            'SELECT academic_session_id FROM timetable_versions WHERE id = $1 AND tenant_id = $2',
+            [id, tenantId]
+        );
+        if (versionRes.rows.length === 0) {
+            throw new Error("Timetable version not found");
+        }
+        const sessionId = versionRes.rows[0].academic_session_id;
+
+        const client = await db.pool.connect();
+        try {
+            await client.query('BEGIN');
+            
+            await client.query(
+                "UPDATE timetable_versions SET status = 'ARCHIVED' WHERE academic_session_id = $1 AND tenant_id = $2 AND id <> $3",
+                [sessionId, tenantId, id]
+            );
+            
+            const result = await client.query(
+                "UPDATE timetable_versions SET status = 'DRAFT', created_at = NOW() WHERE id = $1 AND tenant_id = $2 RETURNING *",
+                [id, tenantId]
+            );
+            
+            await client.query('COMMIT');
+            return result.rows[0];
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    async getStudentTimetable(studentId, tenantId, sessionId = null) {
+        let query = `
+            SELECT ta.*, c.name as "courseName", c.code as "courseCode", r.name as "roomName"
+            FROM timetable_allocations ta
+            JOIN student_registrations sr ON sr.unit_id = ta.course_id
+            JOIN courses c ON ta.course_id::uuid = c.id
+            JOIN rooms r ON ta.room_id::uuid = r.id
+            WHERE sr.student_id = $1 AND ta.tenant_id = $2 AND sr.tenant_id = $2 AND sr.registration_status = 'REGISTERED'
+        `;
+        const params = [studentId, tenantId];
+        if (sessionId) {
+            query += ' AND sr.session_id = $3';
+            params.push(sessionId);
+        }
+        const result = await db.query(query, params);
+        return result.rows;
+    }
+
+    async getLecturerTimetable(lecturerId, tenantId, sessionId = null) {
+        let query = `
+            SELECT ta.*, c.name as "courseName", c.code as "courseCode", r.name as "roomName"
+            FROM timetable_allocations ta
+            JOIN courses c ON ta.course_id::uuid = c.id
+            JOIN rooms r ON ta.room_id::uuid = r.id
+            JOIN timetable_versions tv ON ta.timetable_version_id = tv.id
+            WHERE ta.lecturer_id = $1 AND ta.tenant_id = $2
+        `;
+        const params = [lecturerId, tenantId];
+        if (sessionId) {
+            query += ' AND tv.academic_session_id = $3';
+            params.push(sessionId);
+        }
+        const result = await db.query(query, params);
+        return result.rows;
+    }
+
+    async getDepartmentTimetable(deptId, tenantId) {
+        const result = await db.query(
+            `SELECT ta.*, c.name as "courseName", c.code as "courseCode", r.name as "roomName"
+             FROM timetable_allocations ta
+             JOIN courses c ON ta.course_id::uuid = c.id
+             JOIN rooms r ON ta.room_id::uuid = r.id
+             WHERE c.department_id = $1 AND ta.tenant_id = $2`,
+            [deptId, tenantId]
+        );
+        return result.rows;
+    }
+
+    async getRoomTimetable(roomId, tenantId) {
+        const result = await db.query(
+            `SELECT ta.*, c.name as "courseName", c.code as "courseCode", r.name as "roomName"
+             FROM timetable_allocations ta
+             JOIN courses c ON ta.course_id::uuid = c.id
+             JOIN rooms r ON ta.room_id::uuid = r.id
+             WHERE ta.room_id = $1 AND ta.tenant_id = $2`,
+            [roomId, tenantId]
+        );
+        return result.rows;
+    }
 }
 
 module.exports = new TimetableService();

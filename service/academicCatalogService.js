@@ -74,6 +74,28 @@ class AcademicCatalogService {
         const result = await db.query('SELECT * FROM campuses WHERE tenant_id = $1 ORDER BY name ASC', [tenantId]);
         return result.rows;
     }
+
+    async getCampusById(id, tenantId) {
+        const result = await db.query('SELECT * FROM campuses WHERE id = $1 AND tenant_id = $2', [id, tenantId]);
+        return result.rows[0];
+    }
+
+    async updateCampus(id, tenantId, { name, location }) {
+        const result = await db.query(
+            `UPDATE campuses
+             SET name = COALESCE($3, name),
+                 location = COALESCE($4, location)
+             WHERE id = $1 AND tenant_id = $2
+             RETURNING *`,
+            [id, tenantId, name, location]
+        );
+        return result.rows[0];
+    }
+
+    async deleteCampus(id, tenantId) {
+        const result = await db.query('DELETE FROM campuses WHERE id = $1 AND tenant_id = $2 RETURNING *', [id, tenantId]);
+        return result.rows[0];
+    }
 }
 
 module.exports = new AcademicCatalogService();

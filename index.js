@@ -15,6 +15,20 @@ const courseStreamRoutes = require("./Routes/courseStreamRoutes");
 const studentRegistrationRoutes = require("./Routes/studentRegistrationRoutes");
 const academicCatalogRoutes = require("./Routes/academicCatalogRoutes");
 const examRoutes = require("./Routes/examRoutes");
+const enterpriseRoutes = require("./Routes/enterpriseRoutes");
+const campusRoutes = require("./Routes/campusRoutes");
+const roomTagRoutes = require("./Routes/roomTagRoutes");
+const timetableVersionRoutes = require("./Routes/timetableVersionRoutes");
+const studentRoutes = require("./Routes/studentRoutes");
+const lecturerRoutes = require("./Routes/lecturerRoutes");
+const departmentRoutes = require("./Routes/departmentRoutes");
+const seatingPlanRoutes = require("./Routes/seatingPlanRoutes");
+const studentAccommodationRoutes = require("./Routes/studentAccommodationRoutes");
+const academicCalendarRoutes = require("./Routes/academicCalendarRoutes");
+const notificationRoutes = require("./Routes/notificationRoutes");
+const auditLogRoutes = require("./Routes/auditLogRoutes");
+const reportRoutes = require("./Routes/reportRoutes");
+const integrationRoutes = require("./Routes/integrationRoutes");
 
 dotenv.config();
 
@@ -61,6 +75,20 @@ app.use('/api/course-streams', courseStreamRoutes);
 app.use('/api/student-registrations', studentRegistrationRoutes);
 app.use('/api/academic-catalogs', academicCatalogRoutes);
 app.use('/api/exams', examRoutes);
+app.use('/api/enterprise', enterpriseRoutes);
+app.use('/api/campuses', campusRoutes);
+app.use('/api/room-tags', roomTagRoutes);
+app.use('/api/timetable-versions', timetableVersionRoutes);
+app.use('/api/students', studentRoutes);
+app.use('/api/lecturers', lecturerRoutes);
+app.use('/api/departments', departmentRoutes);
+app.use('/api/seating-plans', seatingPlanRoutes);
+app.use('/api/student-accommodations', studentAccommodationRoutes);
+app.use('/api/academic-calendar', academicCalendarRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/audit-logs', auditLogRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/integrations', integrationRoutes);
 
 const PORT = process.env.PORT || 3001;
 

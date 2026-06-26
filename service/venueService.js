@@ -75,10 +75,91 @@ const deleteVenue = async (venueId, tenantId) => {
     }
 };
 
+// Room Tags
+const createRoomTag = async ({ tenantId, tagName }) => {
+    try {
+        const result = await db.query(
+            `INSERT INTO room_tags (tenant_id, tag_name)
+             VALUES ($1, $2)
+             ON CONFLICT (tenant_id, tag_name) DO UPDATE SET tag_name = EXCLUDED.tag_name
+             RETURNING id, tag_name as "tagName", created_at as "createdAt"`,
+            [tenantId, tagName.toUpperCase()]
+        );
+        return result.rows[0];
+    } catch (error) {
+        throw new Error('Failed to create room tag');
+    }
+};
+
+const getRoomTags = async (tenantId) => {
+    try {
+        const result = await db.query(
+            `SELECT id, tag_name as "tagName", created_at as "createdAt"
+             FROM room_tags
+             WHERE tenant_id = $1 ORDER BY tag_name ASC`,
+            [tenantId]
+        );
+        return result.rows;
+    } catch (error) {
+        throw new Error('Failed to fetch room tags');
+    }
+};
+
+// Venue Tags
+const addVenueTag = async ({ tenantId, venueId, tagId }) => {
+    try {
+        const result = await db.query(
+            `INSERT INTO venue_tags (tenant_id, venue_id, tag_id)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (tenant_id, venue_id, tag_id) DO UPDATE SET tag_id = EXCLUDED.tag_id
+             RETURNING id, venue_id as "venueId", tag_id as "tagId", created_at as "createdAt"`,
+            [tenantId, venueId, tagId]
+        );
+        return result.rows[0];
+    } catch (error) {
+        throw new Error('Failed to add venue tag');
+    }
+};
+
+const getVenueTags = async (venueId, tenantId) => {
+    try {
+        const result = await db.query(
+            `SELECT vt.id, vt.venue_id as "venueId", vt.tag_id as "tagId", rt.tag_name as "tagName", vt.created_at as "createdAt"
+             FROM venue_tags vt
+             JOIN room_tags rt ON vt.tag_id = rt.id
+             WHERE vt.venue_id = $1 AND vt.tenant_id = $2`,
+            [venueId, tenantId]
+        );
+        return result.rows;
+    } catch (error) {
+        throw new Error('Failed to fetch venue tags');
+    }
+};
+
+const deleteVenueTag = async ({ tenantId, venueId, tagId }) => {
+    try {
+        const result = await db.query(
+            `DELETE FROM venue_tags
+             WHERE tenant_id = $1 AND venue_id = $2 AND tag_id = $3
+             RETURNING id`,
+            [tenantId, venueId, tagId]
+        );
+        if (result.rows.length === 0) return null;
+        return result.rows[0];
+    } catch (error) {
+        throw new Error('Failed to delete venue tag');
+    }
+};
+
 module.exports = {
     getAllVenues,
     getVenueById,
     addVenue,
     updateVenue,
-    deleteVenue
+    deleteVenue,
+    createRoomTag,
+    getRoomTags,
+    addVenueTag,
+    getVenueTags,
+    deleteVenueTag
 };
