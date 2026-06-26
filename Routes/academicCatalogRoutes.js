@@ -12,16 +12,17 @@ const {
 const isAdmin = require("../middleware/UserAdmin");
 const authMiddleware = require("../middleware/authMiddleware");
 const tenantMiddleware = require("../middleware/tenantMiddleware");
+const featureGuard = require("../middleware/featureGuard");
 
 const router = Router();
 
 // Faculties
-router.post("/faculties", authMiddleware, tenantMiddleware, isAdmin, createFaculty);
-router.get("/faculties", authMiddleware, tenantMiddleware, getFaculties);
+router.post("/faculties", authMiddleware, tenantMiddleware, featureGuard, isAdmin, createFaculty);
+router.get("/faculties", authMiddleware, tenantMiddleware, featureGuard, getFaculties);
 
 // Departments
-router.post("/departments", authMiddleware, tenantMiddleware, isAdmin, createDepartment);
-router.get("/departments", authMiddleware, tenantMiddleware, getDepartments);
+router.post("/departments", authMiddleware, tenantMiddleware, featureGuard, isAdmin, createDepartment);
+router.get("/departments", authMiddleware, tenantMiddleware, featureGuard, getDepartments);
 
 // Units
 router.post("/units", authMiddleware, tenantMiddleware, isAdmin, createUnit);

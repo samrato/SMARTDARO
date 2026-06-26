@@ -183,6 +183,76 @@ const getAuditLogsByUser = async (req, res) => {
     }
 };
 
+const getTenantSettings = async (req, res) => {
+    try {
+        const settings = await service.getTenantSettings(req.tenantId);
+        res.json({ status: "success", settings });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Failed to fetch tenant settings" });
+    }
+};
+
+const updateTenantSettings = async (req, res) => {
+    try {
+        const settings = await service.updateTenantSettings(req.tenantId, req.body.settings);
+        const cache = require('../service/redisService');
+        await cache.deleteCache(`tenant_settings:${req.tenantId}`);
+        await logAudit(req, 'UPDATE_SETTINGS', 'tenants', req.tenantId);
+        res.json({ status: "success", settings });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Failed to update tenant settings" });
+    }
+};
+
+const registerTenant = async (req, res) => {
+    try {
+        const { tenantName, domain, adminName, adminEmail, adminPassword, settings } = req.body;
+        
+        if (!tenantName || !domain || !adminName || !adminEmail || !adminPassword) {
+            return res.status(422).json({ message: "Fill in all fields" });
+        }
+
+        const db = require('../database/pgDb');
+        const bcrypt = require('bcryptjs');
+
+        // Check if admin user already exists
+        const userCheck = await db.query("SELECT id FROM users WHERE LOWER(email) = LOWER($1)", [adminEmail]);
+        if (userCheck.rows.length > 0) {
+            return res.status(422).json({ message: "Admin email already exists" });
+        }
+
+        // Insert new tenant
+        const tenantRes = await db.query(
+            "INSERT INTO tenants (name, domain, settings) VALUES ($1, $2, $3) RETURNING id, name, domain, settings",
+            [tenantName, domain.toLowerCase(), JSON.stringify(settings || { schoolType: "university" })]
+        );
+        const tenant = tenantRes.rows[0];
+
+        // Hash admin password
+        const hashedPassword = await bcrypt.hash(adminPassword, 10);
+
+        // Insert admin user
+        const userRes = await db.query(
+            `INSERT INTO users (full_name, email, password, role, is_admin, tenant_id)
+             VALUES ($1, $2, $3, 'admin', true, $4) RETURNING id, full_name as "fullName", email, role`,
+            [adminName, adminEmail.toLowerCase(), hashedPassword, tenant.id]
+        );
+        const user = userRes.rows[0];
+
+        res.status(201).json({
+            status: "success",
+            message: "Institution registered successfully",
+            tenant,
+            user
+        });
+    } catch (err) {
+        console.error("Tenant registration error:", err);
+        res.status(500).json({ message: "Failed to register institution" });
+    }
+};
+
 module.exports = {
     createRoomTag,
     getRoomTags,
@@ -200,5 +270,8 @@ module.exports = {
     markAsRead,
     getAuditLogs,
     getAuditLogsByEntity,
-    getAuditLogsByUser
+    getAuditLogsByUser,
+    getTenantSettings,
+    updateTenantSettings,
+    registerTenant
 };

@@ -43,14 +43,14 @@ const getCourseByIdController = async (req, res, next) => {
 // Add course (Admin only)
 const addCourseController = async (req, res, next) => {
     try {
-        const { name, code, instructorId, capacity, duration } = req.body;
+        const { name, code, instructorId, capacity, duration, departmentId } = req.body;
         const tenantId = req.tenantId;
 
         if (!name || !code || !instructorId || !capacity || !duration) {
             return res.status(422).json({ message: "All fields are required" });
         }
 
-        const newCourse = await courseService.createCourse({ tenantId, name, code, instructorId, capacity, duration });
+        const newCourse = await courseService.createCourse({ tenantId, name, code, instructorId, capacity, duration, departmentId });
         await cache.clearPattern(`courses:${tenantId}:*`);
         res.status(201).json({ status: "success", course: newCourse });
     } catch (error) {

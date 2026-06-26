@@ -8,8 +8,11 @@ const {
 const authMiddleware = require("../middleware/authMiddleware");
 const tenantMiddleware = require("../middleware/tenantMiddleware");
 const isAdmin = require("../middleware/UserAdmin");
+const featureGuard = require("../middleware/featureGuard");
 
 const router = Router();
+
+router.use(authMiddleware, tenantMiddleware, featureGuard);
 
 router.post("/moodle/connect", authMiddleware, tenantMiddleware, isAdmin, connectMoodle);
 router.post("/canvas/connect", authMiddleware, tenantMiddleware, isAdmin, connectCanvas);

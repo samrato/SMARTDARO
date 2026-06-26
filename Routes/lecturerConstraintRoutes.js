@@ -7,8 +7,11 @@ const {
 const authMiddleware = require("../middleware/authMiddleware");
 const tenantMiddleware = require("../middleware/tenantMiddleware");
 const isAdmin = require("../middleware/UserAdmin");
+const featureGuard = require("../middleware/featureGuard");
 
 const router = Router();
+
+router.use(authMiddleware, tenantMiddleware, featureGuard);
 
 router.post("/", authMiddleware, tenantMiddleware, upsertLecturerConstraints);
 router.get("/:lecturerId", authMiddleware, tenantMiddleware, getLecturerConstraints);

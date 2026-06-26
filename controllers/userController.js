@@ -10,7 +10,7 @@ const generateToken = (payload) => {
 // ================== REGISTER USER ==================
 const registerUser = async (req, res, next) => {
     try {
-        const { fullName, email, password, password2, role } = req.body;
+        const { fullName, email, password, password2, role, regNumber, departmentId, facultyId } = req.body;
 
         if (!fullName || !email || !password || !password2) {
             return res.status(422).json({ message: "Fill in all fields" });
@@ -22,6 +22,13 @@ const registerUser = async (req, res, next) => {
         const existingRes = await db.query("SELECT id FROM users WHERE email = $1", [newEmail]);
         if (existingRes.rows.length > 0) {
             return res.status(422).json({ message: "Email already exists" });
+        }
+
+        if (regNumber) {
+            const existingReg = await db.query("SELECT id FROM users WHERE LOWER(reg_number) = LOWER($1)", [regNumber]);
+            if (existingReg.rows.length > 0) {
+                return res.status(422).json({ message: "Registration number already exists" });
+            }
         }
 
         if (password.trim().length < 6) {
@@ -61,9 +68,9 @@ const registerUser = async (req, res, next) => {
         const tenantId = (req.tenantId || (req.user && req.user.tenantId)) || '550e8400-e29b-41d4-a716-446655440000'; // Default Tenant
 
         await db.query(
-            `INSERT INTO users (full_name, email, password, role, is_admin, tenant_id)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [fullName, newEmail, hashedPassword, userRole, isAdmin, tenantId]
+            `INSERT INTO users (full_name, email, password, role, is_admin, tenant_id, reg_number, department_id, faculty_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            [fullName, newEmail, hashedPassword, userRole, isAdmin, tenantId, regNumber || null, departmentId || null, facultyId || null]
         );
 
         res.status(201).json({ message: `User ${fullName} registered successfully` });
@@ -82,8 +89,11 @@ const loginUser = async (req, res, next) => {
             return res.status(422).json({ message: "Fill in all fields" });
         }
 
-        const newEmail = email.toLowerCase();
-        const userRes = await db.query("SELECT * FROM users WHERE email = $1", [newEmail]);
+        const identifier = email.trim().toLowerCase();
+        const userRes = await db.query(
+            "SELECT * FROM users WHERE LOWER(email) = $1 OR LOWER(reg_number) = $1",
+            [identifier]
+        );
 
         if (userRes.rows.length === 0) {
             return res.status(422).json({ message: "Invalid Credentials" });
@@ -122,7 +132,7 @@ const getUser = async (req, res, next) => {
         const { userId } = req.params;
         const userRes = await db.query(
             `SELECT id, full_name as "fullName", email, is_admin as "isAdmin", 
-                    role, tenant_id as "tenantId", preferences 
+                    role, tenant_id as "tenantId", preferences, department_id as "departmentId", faculty_id as "facultyId"
              FROM users WHERE id = $1`,
             [userId]
         );

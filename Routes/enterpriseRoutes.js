@@ -16,7 +16,10 @@ const {
     markAsRead,
     getAuditLogs,
     getAuditLogsByEntity,
-    getAuditLogsByUser
+    getAuditLogsByUser,
+    getTenantSettings,
+    updateTenantSettings,
+    registerTenant
 } = require("../controllers/enterpriseController");
 const isAdmin = require("../middleware/UserAdmin");
 const authMiddleware = require("../middleware/authMiddleware");
@@ -50,5 +53,12 @@ router.put("/notifications/:id/read", authMiddleware, tenantMiddleware, markAsRe
 router.get("/audit-logs", authMiddleware, tenantMiddleware, isAdmin, getAuditLogs);
 router.get("/audit-logs/entity/:entityId", authMiddleware, tenantMiddleware, isAdmin, getAuditLogsByEntity);
 router.get("/audit-logs/user/:userId", authMiddleware, tenantMiddleware, isAdmin, getAuditLogsByUser);
+
+// Tenant settings
+router.get("/settings", authMiddleware, tenantMiddleware, getTenantSettings);
+router.put("/settings", authMiddleware, tenantMiddleware, isAdmin, updateTenantSettings);
+
+// Public tenant registration wizard
+router.post("/register-tenant", registerTenant);
 
 module.exports = router;

@@ -89,6 +89,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/integrations', integrationRoutes);
+app.use('/api/super-admin', require('./Routes/superAdminRoutes'));
 
 const PORT = process.env.PORT || 3001;
 

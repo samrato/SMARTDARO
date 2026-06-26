@@ -146,6 +146,22 @@ class EnterpriseService {
         );
         return result.rows;
     }
+
+    async getTenantSettings(tenantId) {
+        const result = await db.query(
+            "SELECT settings FROM tenants WHERE id = $1",
+            [tenantId]
+        );
+        return result.rows[0] ? result.rows[0].settings : {};
+    }
+
+    async updateTenantSettings(tenantId, settings) {
+        const result = await db.query(
+            "UPDATE tenants SET settings = $1 WHERE id = $2 RETURNING settings",
+            [JSON.stringify(settings || {}), tenantId]
+        );
+        return result.rows[0] ? result.rows[0].settings : {};
+    }
 }
 
 module.exports = new EnterpriseService();

@@ -19,8 +19,11 @@ const {
 const isAdmin = require("../middleware/UserAdmin");
 const authMiddleware = require("../middleware/authMiddleware");
 const tenantMiddleware = require("../middleware/tenantMiddleware");
+const featureGuard = require("../middleware/featureGuard");
 
 const router = Router();
+
+router.use(authMiddleware, tenantMiddleware, featureGuard);
 
 router.post("/", authMiddleware, tenantMiddleware, isAdmin, createExamController);
 router.get("/", authMiddleware, tenantMiddleware, getExamsController);

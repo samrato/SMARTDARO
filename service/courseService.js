@@ -4,7 +4,7 @@ const db = require("../database/pgDb");
 const getAllCourses = async (tenantId) => {
     try {
         const result = await db.query(`
-            SELECT c.id, c.name, c.code, c.capacity, c.duration,
+            SELECT c.id, c.name, c.code, c.capacity, c.duration, c.department_id as "departmentId",
                    u.id as "inst_id", u.full_name as "inst_name", u.email as "inst_email"
             FROM courses c
             LEFT JOIN users u ON c.instructor_id = u.id
@@ -16,6 +16,7 @@ const getAllCourses = async (tenantId) => {
             code: row.code,
             capacity: row.capacity,
             duration: row.duration,
+            departmentId: row.departmentId,
             instructor: row.inst_id ? {
                 id: row.inst_id,
                 fullName: row.inst_name,
@@ -32,7 +33,7 @@ const getAllCourses = async (tenantId) => {
 const getCourseById = async (id, tenantId) => {
     try {
         const result = await db.query(`
-            SELECT c.id, c.name, c.code, c.capacity, c.duration,
+            SELECT c.id, c.name, c.code, c.capacity, c.duration, c.department_id as "departmentId",
                    u.id as "inst_id", u.full_name as "inst_name", u.email as "inst_email"
             FROM courses c
             LEFT JOIN users u ON c.instructor_id = u.id
@@ -47,6 +48,7 @@ const getCourseById = async (id, tenantId) => {
             code: row.code,
             capacity: row.capacity,
             duration: row.duration,
+            departmentId: row.departmentId,
             instructor: row.inst_id ? {
                 id: row.inst_id,
                 fullName: row.inst_name,
@@ -60,16 +62,16 @@ const getCourseById = async (id, tenantId) => {
 };
 
 // Add a new course
-const createCourse = async ({ tenantId, name, code, instructorId, capacity, duration }) => {
+const createCourse = async ({ tenantId, name, code, instructorId, capacity, duration, departmentId }) => {
     try {
         const existing = await db.query('SELECT id FROM courses WHERE code = $1 AND tenant_id = $2', [code, tenantId]);
         if (existing.rows.length > 0) throw new Error("Course code already exists");
 
         const result = await db.query(`
-            INSERT INTO courses (tenant_id, name, code, instructor_id, capacity, duration)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING id, name, code, capacity, duration, instructor_id as "instructorId"
-        `, [tenantId, name, code, instructorId || null, capacity || 40, duration || 2]);
+            INSERT INTO courses (tenant_id, name, code, instructor_id, capacity, duration, department_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id, name, code, capacity, duration, instructor_id as "instructorId", department_id as "departmentId"
+        `, [tenantId, name, code, instructorId || null, capacity || 40, duration || 2, departmentId || null]);
 
         return result.rows[0];
     } catch (error) {
@@ -86,6 +88,9 @@ const updateCourse = async (id, tenantId, updatedData) => {
         for (const [key, val] of Object.entries(updatedData)) {
             if (key === 'instructorId' || key === 'instructor') {
                 fields.push(`instructor_id = $${idx}`);
+                values.push(val);
+            } else if (key === 'departmentId') {
+                fields.push(`department_id = $${idx}`);
                 values.push(val);
             } else if (['name', 'code', 'capacity', 'duration'].includes(key)) {
                 fields.push(`${key} = $${idx}`);
