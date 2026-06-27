@@ -45,8 +45,8 @@ const registerUser = async (req, res, next) => {
         const adminCheck = await db.query("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
         
         let userRole = 'student';
-        if (role && ['admin', 'instructor'].includes(role)) {
-            if (adminCheck.rows.length > 0) {
+        if (role && ['admin', 'instructor', 'dept_head', 'faculty_officer', 'student'].includes(role)) {
+            if (adminCheck.rows.length > 0 && ['admin', 'instructor', 'dept_head', 'faculty_officer'].includes(role)) {
                 let requestingUser = null;
                 const authHeader = req.headers.authorization || req.headers.Authorization;
                 if (authHeader && authHeader.startsWith("Bearer ")) {
@@ -58,7 +58,7 @@ const registerUser = async (req, res, next) => {
                     }
                 }
                 if (!requestingUser || !requestingUser.isAdmin) {
-                    return res.status(403).json({ message: "Only administrators can create admin or instructor accounts" });
+                    return res.status(403).json({ message: "Only administrators can create admin, instructor, department head, or faculty officer accounts" });
                 }
             }
             userRole = role;
@@ -110,7 +110,9 @@ const loginUser = async (req, res, next) => {
             id: user.id, 
             role: user.role, 
             isAdmin: user.is_admin, 
-            tenantId: user.tenant_id 
+            tenantId: user.tenant_id,
+            facultyId: user.faculty_id,
+            departmentId: user.department_id
         });
 
         res.json({ 
@@ -118,7 +120,9 @@ const loginUser = async (req, res, next) => {
             userId: user.id, 
             role: user.role, 
             isAdmin: user.is_admin, 
-            tenantId: user.tenant_id 
+            tenantId: user.tenant_id,
+            facultyId: user.faculty_id,
+            departmentId: user.department_id
         });
     } catch (error) {
         console.error("Login Error:", error);
@@ -174,4 +178,26 @@ const updateUser = async (req, res, next) => {
     }
 };
 
-module.exports = { registerUser, loginUser, getUser, updateUser };
+// ================== LIST USERS IN TENANT ==================
+const listUsers = async (req, res, next) => {
+    try {
+        const { role } = req.query;
+        let queryStr = `SELECT id, full_name as "fullName", email, role, reg_number as "regNumber", faculty_id as "facultyId", department_id as "departmentId" FROM users WHERE tenant_id = $1`;
+        const params = [req.tenantId];
+
+        if (role) {
+            queryStr += " AND role = $2";
+            params.push(role);
+        }
+
+        queryStr += " ORDER BY full_name ASC";
+
+        const result = await db.query(queryStr, params);
+        res.json({ status: "success", users: result.rows });
+    } catch (error) {
+        console.error("List Users Error:", error);
+        return res.status(500).json({ message: "Could not retrieve user directory" });
+    }
+};
+
+module.exports = { registerUser, loginUser, getUser, updateUser, listUsers };

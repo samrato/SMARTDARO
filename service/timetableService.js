@@ -88,6 +88,60 @@ class TimetableService {
 
         const allocations = [];
 
+        // Fetch tenant settings to determine dynamic scheduling strategy
+        const tenantRes = await db.query('SELECT settings FROM tenants WHERE id = $1', [tenantId]);
+        const tenantSettings = tenantRes.rows[0]?.settings || {};
+        const schoolType = tenantSettings.schoolType || "university";
+
+        const strategies = {
+            university: {
+                name: "University Credit-Based Strategy",
+                resolveStudentConflicts: true,
+                enforceStreamConflicts: false,
+                enforceLecturerMaxHours: true,
+            },
+            college: {
+                name: "College Modular Strategy",
+                resolveStudentConflicts: true,
+                enforceStreamConflicts: false,
+                enforceLecturerMaxHours: true,
+            },
+            high_school: {
+                name: "High School Cohort Strategy",
+                resolveStudentConflicts: false,
+                enforceStreamConflicts: true,
+                enforceLecturerMaxHours: false,
+            },
+            junior_school: {
+                name: "Junior School Grid Strategy",
+                resolveStudentConflicts: false,
+                enforceStreamConflicts: true,
+                enforceLecturerMaxHours: false,
+            },
+            primary: {
+                name: "Primary Homeroom Rotation Strategy",
+                resolveStudentConflicts: false,
+                enforceStreamConflicts: true,
+                enforceLecturerMaxHours: false,
+            }
+        };
+
+        const activeStrategy = strategies[schoolType] || strategies.university;
+        console.log(`Executing timetabling enqueued job using strategy: ${activeStrategy.name}`);
+
+        // Fetch course streams for stream conflict checks
+        const courseStreamsRes = await db.query(
+            'SELECT course_id, stream_code FROM course_streams WHERE tenant_id = $1',
+            [tenantId]
+        );
+        const courseStreamMap = {};
+        for (const row of courseStreamsRes.rows) {
+            if (!courseStreamMap[row.course_id]) {
+                courseStreamMap[row.course_id] = [];
+            }
+            courseStreamMap[row.course_id].push(row.stream_code);
+        }
+
         // Fetch constraints for this tenant
         const constraintsRes = await db.query('SELECT * FROM lecturer_constraints WHERE tenant_id = $1', [tenantId]);
         const lecturerConstraints = constraintsRes.rows;
@@ -122,11 +176,23 @@ class TimetableService {
                             if (lecturerConflict) continue;
                         }
 
-                        // Workload check
-                        const lecturerConstraint = lecturerConstraints.find(c => c.lecturer_id === course.lecturer_id);
-                        const maxHours = lecturerConstraint ? lecturerConstraint.max_hours_per_week : 20;
+                        // Cohort Stream clash check
+                        if (activeStrategy.enforceStreamConflicts) {
+                            const courseStreams = courseStreamMap[course.id] || [];
+                            const streamConflict = allocations.some(a => {
+                                const otherCourseStreams = courseStreamMap[a.courseUnitId] || [];
+                                return a.dayOfWeek === day && 
+                                       a.startTime === slot.startTime && 
+                                       courseStreams.some(s => otherCourseStreams.includes(s));
+                            });
+                            if (streamConflict) continue;
+                        }
 
-                        if (course.lecturer_id) {
+                        // Workload check
+                        if (activeStrategy.enforceLecturerMaxHours && course.lecturer_id) {
+                            const lecturerConstraint = lecturerConstraints.find(c => c.lecturer_id === course.lecturer_id);
+                            const maxHours = lecturerConstraint ? lecturerConstraint.max_hours_per_week : 20;
+
                             const lecturerHours = allocations
                                 .filter(a => a.lecturerId === course.lecturer_id)
                                 .reduce((sum, a) => sum + (a.endTime - a.startTime), 0);
@@ -134,23 +200,25 @@ class TimetableService {
                         }
 
                         // Student clash check (prevent scheduling overlapping classes for students registered in both)
-                        const currentCourseStudents = courseStudents[course.id] || new Set();
-                        let studentConflict = false;
-                        if (currentCourseStudents.size > 0) {
-                            for (const alloc of allocations) {
-                                if (alloc.dayOfWeek === day && alloc.startTime === slot.startTime) {
-                                    const otherCourseStudents = courseStudents[alloc.courseUnitId] || new Set();
-                                    for (const studId of currentCourseStudents) {
-                                        if (otherCourseStudents.has(studId)) {
-                                            studentConflict = true;
-                                            break;
+                        if (activeStrategy.resolveStudentConflicts) {
+                            const currentCourseStudents = courseStudents[course.id] || new Set();
+                            let studentConflict = false;
+                            if (currentCourseStudents.size > 0) {
+                                for (const alloc of allocations) {
+                                    if (alloc.dayOfWeek === day && alloc.startTime === slot.startTime) {
+                                        const otherCourseStudents = courseStudents[alloc.courseUnitId] || new Set();
+                                        for (const studId of currentCourseStudents) {
+                                            if (otherCourseStudents.has(studId)) {
+                                                studentConflict = true;
+                                                break;
+                                            }
                                         }
                                     }
+                                    if (studentConflict) break;
                                 }
-                                if (studentConflict) break;
                             }
+                            if (studentConflict) continue;
                         }
-                        if (studentConflict) continue;
 
                         // If all checks pass, record allocation!
                         allocations.push({
