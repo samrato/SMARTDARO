@@ -76,10 +76,27 @@ const getAllRegistrations = async (req, res, next) => {
     const tenantId = req.tenantId;
 
     try {
-        const result = await db.query(
-            'SELECT * FROM student_registrations WHERE tenant_id = $1 ORDER BY created_at DESC',
-            [tenantId]
-        );
+        const result = await db.query(`
+            SELECT 
+              sr.id,
+              sr.student_id,
+              u.full_name AS student_name,
+              u.reg_number AS student_reg_number,
+              sr.unit_id,
+              un.name AS unit_name,
+              un.code AS unit_code,
+              sr.session_id,
+              s.year_label AS session_year,
+              s.term_label AS session_term,
+              sr.registration_status,
+              sr.created_at
+            FROM student_registrations sr
+            LEFT JOIN users u ON sr.student_id = u.id::text
+            LEFT JOIN units un ON sr.unit_id = un.id::text
+            LEFT JOIN academic_sessions s ON sr.session_id = s.id
+            WHERE sr.tenant_id = $1
+            ORDER BY sr.created_at DESC
+        `, [tenantId]);
         res.json({ status: "success", registrations: result.rows });
     } catch (error) {
         console.error("Error fetching registrations:", error);
@@ -92,10 +109,37 @@ const getRegistrationsByStudent = async (req, res, next) => {
     const tenantId = req.tenantId;
 
     try {
-        const result = await db.query(
-            'SELECT * FROM student_registrations WHERE tenant_id = $1 AND student_id = $2 ORDER BY created_at DESC',
+        const userRes = await db.query(
+            `SELECT id FROM users 
+             WHERE tenant_id = $1 AND (id::text = $2 OR LOWER(reg_number) = LOWER($2))`,
             [tenantId, studentId]
         );
+        let resolvedStudentId = studentId;
+        if (userRes.rows.length > 0) {
+            resolvedStudentId = userRes.rows[0].id;
+        }
+
+        const result = await db.query(`
+            SELECT 
+              sr.id,
+              sr.student_id,
+              u.full_name AS student_name,
+              u.reg_number AS student_reg_number,
+              sr.unit_id,
+              un.name AS unit_name,
+              un.code AS unit_code,
+              sr.session_id,
+              s.year_label AS session_year,
+              s.term_label AS session_term,
+              sr.registration_status,
+              sr.created_at
+            FROM student_registrations sr
+            LEFT JOIN users u ON sr.student_id = u.id::text
+            LEFT JOIN units un ON sr.unit_id = un.id::text
+            LEFT JOIN academic_sessions s ON sr.session_id = s.id
+            WHERE sr.tenant_id = $1 AND sr.student_id = $2
+            ORDER BY sr.created_at DESC
+        `, [tenantId, resolvedStudentId]);
         res.json({ status: "success", registrations: result.rows });
     } catch (error) {
         console.error("Error fetching registrations for student:", error);
